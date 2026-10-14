@@ -32,6 +32,30 @@ in seconds, with nothing outside the phone except the model API.
 - **Portable.** The user layer exports/imports as one file; optional backup/sync to the user's
   storage or a Git repository.
 
+## Document format (schemaVersion 1)
+
+Defined in `src/user-layer/document.ts` (zod schema, also the source of the JSON Schema the agent
+will receive).
+
+```
+{ schemaVersion: 1,
+  collections: { <name>: { fields: { <field>: { type: number | text } } } },
+  screens:     { <id>: { title, body: [ node… ] } },
+  tabs:        [ { screen, title } ]            // at least one }
+```
+
+| Node | Purpose |
+|---|---|
+| `text` | static text |
+| `form` | adds a record to `collection`; inputs: `scale` (number field, integer `min` < `max`, optional end labels), `textInput` (text field, optional `multiline`) |
+| `list` | records of `collection`, showing `fields` |
+| `chart` | number `series` of `collection` against record time |
+| `button` | `navigate` to a screen |
+
+Validation reports every error with its JSON path; references (tabs/buttons → screens,
+form/list/chart → collections, inputs/columns/series → fields of the right type) are checked after
+the structure. The kit grows by adding node types here, test-first.
+
 ## The on-device agent
 
 Claude API tool use inside the app. Tools: read/list/write user-layer documents, validate, run tests,
