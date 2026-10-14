@@ -12,7 +12,6 @@ export * from './data/sql';
 export * from './data/sql-store';
 export * from './data/store';
 export * from './renderer/LayerView';
-export * from './shell/expo-services';
 export * from './shell/SelfDevApp';
 export * from './scripts/check';
 export * from './scripts/sandbox';

@@ -32,6 +32,9 @@ All three gates must be green before a change is done.
   screen-specific, so apps add features in JS alone.
 - **Expo SDK pins** (`expo`, `react`, `react-native`) are peer dependencies and must match the apps.
 - Ships TypeScript source (`main: src/index.ts`); the app's Metro bundler compiles it.
+- The main entry is pure logic and React components. Code that loads native Expo modules lives behind
+  the `./expo` subpath export (`src/shell/expo-services.ts`), so importing the platform in tests or
+  logic never initialises native modules.
 
 ## Docs
 

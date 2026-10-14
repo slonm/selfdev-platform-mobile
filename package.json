@@ -6,6 +6,11 @@
   "main": "src/index.ts",
   "react-native": "src/index.ts",
   "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./expo": "./src/shell/expo-services.ts",
+    "./package.json": "./package.json"
+  },
   "files": [
     "src",
     "!src/**/__tests__",
