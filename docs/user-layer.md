@@ -41,7 +41,8 @@ will receive).
 { schemaVersion: 1,
   collections: { <name>: { fields: { <field>: { type: number | text } } } },
   screens:     { <id>: { title, body: [ node… ] } },
-  tabs:        [ { screen, title } ]            // at least one }
+  tabs:        [ { screen, title } ],           // at least one
+  reminders?:  [ { id, time: "HH:MM", title, body? } ] }   // daily, ids unique
 ```
 
 | Node | Purpose |
@@ -52,7 +53,8 @@ will receive).
 | `chart` | number `series` of `collection` against record time |
 | `button` | `navigate` to a screen |
 
-Validation reports every error with its JSON path; references (tabs/buttons → screens,
+Objects are strict: an unknown property (a typo such as `remniders`) is an error pointing at that
+property, never silently dropped. Validation reports every error with its JSON path; references (tabs/buttons → screens,
 form/list/chart → collections, inputs/columns/series → fields of the right type) are checked after
 the structure. The kit grows by adding node types here, test-first.
 

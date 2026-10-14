@@ -9,7 +9,7 @@ three gates are green.
 | 1 ✅ | User-layer history: versions, preview, accept, undo, safe mode after repeated crashes (`src/user-layer/history.ts`; persistence comes with step 4) | platform, pure TS | changes are reversible |
 | 2 ✅ | Document model + validation: screen built from kit components, bound to a collection (`src/user-layer/document.ts`, zod) | platform, pure TS | an invalid change never activates |
 | 3 ✅ | Renderer: document → React Native (form, scale, text input, text, list, chart, button; tabs + screen stack) over a `DataStore` (in-memory now) — `src/renderer/LayerView.tsx`, `src/data/` | platform, RN testing library | the kit renders documents |
-| 4 | Capabilities API: collections (records), reminders schedule, settings | platform | user layer reads/writes data only through it |
+| 4 ✅ | Capabilities: SQLite record store + key-value (`src/data/sql-store.ts`, tested on real SQLite via `node:sqlite`), daily reminders in the layer + `syncReminders` over a `Notifier` port (`src/capabilities/reminders.ts`). Device adapters (expo-sqlite, expo-notifications) are wired in step 7 | platform | user layer reads/writes data only through it |
 | 5 | Agent: `ModelProvider` interface, tool loop over the user layer, fake provider in tests, Anthropic adapter | platform | agent edits the layer through validated tools |
 | 6 | Script sandbox prototype + on-device test runner | platform | logic changes are tested before activation |
 | 7 | HRV app shell consuming the platform; diary/questionnaire/reminders as the default user layer; HRV maths as a capability | app | the app is mostly user layer |

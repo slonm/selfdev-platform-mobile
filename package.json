@@ -8,10 +8,11 @@
   "types": "src/index.ts",
   "files": [
     "src",
-    "!src/**/__tests__"
+    "!src/**/__tests__",
+    "!src/__fixtures__"
   ],
   "scripts": {
-    "test": "jest",
+    "test": "node --disable-warning=ExperimentalWarning node_modules/jest/bin/jest.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."
   },

@@ -148,6 +148,37 @@ describe('validateLayer', () => {
     expect(errorPaths(layer)).toEqual([['screens', 'history', 'body', 1, 'fields', 1]]);
   });
 
+  it('accepts daily reminders', () => {
+    const layer = { ...sampleLayer(), reminders: [{ id: 'evening', time: '21:00', title: 'Diary', body: 'Fill in today' }] };
+
+    expect(validateLayer(layer).ok).toBe(true);
+  });
+
+  it.each(['25:00', '21:60', '9:30', '21-00'])('rejects reminder time %s', (time) => {
+    const layer = { ...sampleLayer(), reminders: [{ id: 'r', time, title: 'x' }] };
+
+    expect(errorPaths(layer)).toEqual([['reminders', 0, 'time']]);
+  });
+
+  it('rejects two reminders with the same id', () => {
+    const layer = {
+      ...sampleLayer(),
+      reminders: [
+        { id: 'r', time: '08:00', title: 'a' },
+        { id: 'r', time: '21:00', title: 'b' },
+      ],
+    };
+
+    expect(errorPaths(layer)).toEqual([['reminders', 1, 'id']]);
+  });
+
+  it('rejects a property the format does not define, pointing at the property', () => {
+    const layer = { ...sampleLayer(), remniders: [] };
+    layer.screens.today.body[0].colour = 'red';
+
+    expect(errorPaths(layer)).toEqual([['screens', 'today', 'body', 0, 'colour'], ['remniders']]);
+  });
+
   it('reports something readable for every error', () => {
     const r = validateLayer({ schemaVersion: 1 });
 
