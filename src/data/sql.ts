@@ -4,6 +4,6 @@
  */
 export interface SqlDatabase {
   execAsync(source: string): Promise<void>;
-  runAsync(source: string, params?: (string | number | null)[]): Promise<unknown>;
-  getAllAsync<T>(source: string, params?: (string | number | null)[]): Promise<T[]>;
+  runAsync(source: string, params: (string | number | null)[]): Promise<unknown>;
+  getAllAsync<T>(source: string, params: (string | number | null)[]): Promise<T[]>;
 }

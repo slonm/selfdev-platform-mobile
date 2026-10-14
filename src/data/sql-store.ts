@@ -20,7 +20,7 @@ export async function openSqlStore(
     `CREATE TABLE IF NOT EXISTS records (
        id TEXT PRIMARY KEY, collection TEXT NOT NULL, created_at INTEGER NOT NULL, values_json TEXT NOT NULL);`
   );
-  const rows = await db.getAllAsync<Row>('SELECT id, collection, created_at, values_json FROM records ORDER BY rowid');
+  const rows = await db.getAllAsync<Row>('SELECT id, collection, created_at, values_json FROM records ORDER BY rowid', []);
   const onError = opts.onError ?? ((e: unknown) => console.error('record write failed', e));
   let pending: Promise<void> = Promise.resolve();
 

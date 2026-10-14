@@ -13,10 +13,10 @@ export function nodeSqlite(): SqlDatabase {
     async execAsync(source) {
       db.exec(source);
     },
-    async runAsync(source, params = []) {
+    async runAsync(source, params) {
       db.prepare(source).run(...params);
     },
-    async getAllAsync<T>(source: string, params: (string | number | null)[] = []) {
+    async getAllAsync<T>(source: string, params: (string | number | null)[]) {
       return db.prepare(source).all(...params) as T[];
     },
   };

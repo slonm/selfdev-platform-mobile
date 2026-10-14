@@ -12,7 +12,9 @@ three gates are green.
 | 4 ✅ | Capabilities: SQLite record store + key-value (`src/data/sql-store.ts`, tested on real SQLite via `node:sqlite`), daily reminders in the layer + `syncReminders` over a `Notifier` port (`src/capabilities/reminders.ts`). Device adapters (expo-sqlite, expo-notifications) are wired in step 7 | platform | user layer reads/writes data only through it |
 | 5 ✅ | Agent: provider-neutral model (`src/agent/provider.ts`), tool loop (`loop.ts`), layer tools read_layer / propose_layer / describe_data (`layer-tools.ts`), Anthropic SDK adapter usable with `Anthropic` or `AnthropicFoundry` clients (`anthropic.ts`), default system prompt + app guide (`system-prompt.ts`) | platform | agent edits the layer through validated tools |
 | 6 ✅ | Script sandbox: JS-Interpreter (ES5, step-limited, no host access) chosen over QuickJS-asm.js (5 MB) after a Node measurement (48 vs 74 ms on a 365-record script; device measurement in step 8) — `src/scripts/sandbox.ts`; script tests run by `checkScripts` before a proposal can preview; computed collections (`compute`) via `withComputed` | platform | logic changes are tested before activation |
-| 7 | HRV app shell consuming the platform; diary/questionnaire/reminders as the default user layer; HRV maths as a capability | app | the app is mostly user layer |
+| 7a ✅ | `action` nodes: app-provided capabilities run by name, validated against the app's list (`src/capabilities/actions.ts`) | platform | apps extend the kit without platform changes |
+| 7b ✅ | `SelfDevApp` shell: restore history (`restoreHistory`), launch tracking, reminder sync, preview banner, agent chat and AI settings; Expo services (`src/shell/`) | platform | a whole app is one component plus a layer |
+| 7c | HRV app on the platform: diary/questionnaire/reminders as the default user layer, phase flags as a computed collection, Polar import as an action | app | the app is mostly user layer |
 | 8 | EAS development build on the phone (Android 16) | app | runs on real hardware |
 | 9 | Polar H10 native module (offline RR recording, download) | app | data without manual export |
 
