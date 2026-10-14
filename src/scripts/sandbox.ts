@@ -1,3 +1,5 @@
+// Ships the hand-written typing with the code, so apps compiling this source see it too.
+/// <reference path="../types/js-interpreter.d.ts" />
 import Interpreter from 'js-interpreter';
 
 export type ScriptResult =
