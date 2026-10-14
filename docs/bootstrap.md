@@ -15,8 +15,12 @@ three gates are green.
 | 7a ✅ | `action` nodes: app-provided capabilities run by name, validated against the app's list (`src/capabilities/actions.ts`) | platform | apps extend the kit without platform changes |
 | 7b ✅ | `SelfDevApp` shell: restore history (`restoreHistory`), launch tracking, reminder sync, preview banner, agent chat and AI settings; Expo services (`src/shell/`) | platform | a whole app is one component plus a layer |
 | 7c ✅ | HRV app on the platform: diary/questionnaire/reminders as the default user layer, phase flags as a computed collection, Polar import as an action; Android bundle exports locally | app | the app is mostly user layer |
-| 8 | EAS build on the phone (Android 16): first APK = platform + app as is; measure the sandbox on Hermes; verify SQLite, notifications, secure store, Claude/Foundry from React Native | app | runs on real hardware |
-| 9 | Second APK, batching the native changes: Polar H10 module (offline RR recording, download) and expo-updates for over-the-air delivery | app | data without manual export; JS updates without reinstall |
+| 8 🔶 APK built, device check pending | EAS build on the phone (Android 16): first APK = platform + app as is; measure the sandbox on Hermes; verify SQLite, notifications, secure store, Claude/Foundry from React Native | app | runs on real hardware |
+| 9 🔶 APK built (H10 module compiles), device check pending | Second APK, batching the native changes: Polar H10 module (offline RR recording, download) and expo-updates for over-the-air delivery | app | data without manual export; JS updates without reinstall |
 
 During steps 1–7 the app consumes the platform from the sibling checkout (local file dependency);
 publishing switches it to the public package.
+
+Known gap: a new default layer in an app update does not reach installs that already have a
+history (`restoreHistory` keeps the user's accepted version). Needed: offer the new default as a
+preview after an update.
