@@ -67,6 +67,27 @@ describe('layer tools', () => {
     expect(s.history().versions).toHaveLength(1);
   });
 
+  it('accepts only actions the app provides, and tells the model what they do', async () => {
+    let history: History<UserLayer> = createHistory(sampleLayer);
+    const tools = createLayerTools({
+      getHistory: () => history,
+      setHistory: (h) => {
+        history = h;
+      },
+      store: createMemoryStore(),
+      actions: { importNight: { description: 'Imports a Polar RR file as a night', run: async () => undefined } },
+    });
+    const proposeTool = tools.find((t) => t.name === 'propose_layer')!;
+    const withAction = (action: string) => ({
+      ...sampleLayer,
+      screens: { ...sampleLayer.screens, about: { title: 'About', body: [{ type: 'action', label: 'Go', action }] } },
+    });
+
+    expect((await proposeTool.run({ layer: withAction('deleteAll') })).isError).toBe(true);
+    expect((await proposeTool.run({ layer: withAction('importNight') })).isError).toBeFalsy();
+    expect(proposeTool.description).toContain('importNight: Imports a Polar RR file as a night');
+  });
+
   it('rejects a call without a layer', async () => {
     const s = session();
 

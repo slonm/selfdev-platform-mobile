@@ -1,6 +1,7 @@
 import { useMemo, useState, useSyncExternalStore } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import type { AppActions } from '../capabilities/actions';
 import { withComputed } from '../data/computed-store';
 import type { DataRecord, DataStore, FieldValue } from '../data/store';
 import type { UserLayer } from '../user-layer/document';
@@ -13,7 +14,16 @@ type NodeOf<T extends Node['type']> = Extract<Node, { type: T }>;
  * Draws a validated user layer: a tab bar over the layer's tabs, a stack of screens reached with
  * `button` nodes, and each node of the component kit bound to the data store.
  */
-export function LayerView({ layer, store: baseStore }: { layer: UserLayer; store: DataStore }) {
+export function LayerView({
+  layer,
+  store: baseStore,
+  actions = {},
+}: {
+  layer: UserLayer;
+  store: DataStore;
+  /** App actions that `action` nodes may run. */
+  actions?: AppActions;
+}) {
   const store = useMemo(
     () => withComputed(baseStore, layer, { onError: (c, m) => console.warn(`computed collection "${c}": ${m}`) }),
     [baseStore, layer]
@@ -45,7 +55,7 @@ export function LayerView({ layer, store: baseStore }: { layer: UserLayer; store
       <ScrollView contentContainerStyle={styles.body}>
         {current.body.map((node, i) => (
           // A new layer remounts nodes, so form input made against the old one is dropped.
-          <NodeView key={`${generation}-${screenId}-${i}`} node={node} store={store} navigate={navigate} />
+          <NodeView key={`${generation}-${screenId}-${i}`} node={node} store={store} navigate={navigate} actions={actions} />
         ))}
       </ScrollView>
       <View style={styles.tabs}>
@@ -67,7 +77,17 @@ export function LayerView({ layer, store: baseStore }: { layer: UserLayer; store
   );
 }
 
-function NodeView({ node, store, navigate }: { node: Node; store: DataStore; navigate: (id: string) => void }) {
+function NodeView({
+  node,
+  store,
+  navigate,
+  actions,
+}: {
+  node: Node;
+  store: DataStore;
+  navigate: (id: string) => void;
+  actions: AppActions;
+}) {
   switch (node.type) {
     case 'text':
       return <Text style={styles.text}>{node.value}</Text>;
@@ -77,6 +97,8 @@ function NodeView({ node, store, navigate }: { node: Node; store: DataStore; nav
       return <ListView node={node} store={store} />;
     case 'chart':
       return <ChartView node={node} store={store} />;
+    case 'action':
+      return <ActionButton node={node} store={store} actions={actions} />;
     case 'button':
       return (
         <Pressable accessibilityRole="button" onPress={() => navigate(node.navigate)} style={styles.button}>
@@ -94,6 +116,38 @@ function layerGeneration(layer: UserLayer): number {
   let n = generations.get(layer);
   if (n === undefined) generations.set(layer, (n = ++nextGeneration));
   return n;
+}
+
+function ActionButton({ node, store, actions }: { node: NodeOf<'action'>; store: DataStore; actions: AppActions }) {
+  const [running, setRunning] = useState(false);
+  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
+  const run = async () => {
+    const action = actions[node.action];
+    if (!action) return setMessage({ text: `No action "${node.action}"`, error: true });
+    setRunning(true);
+    setMessage(null);
+    try {
+      const text = await action.run({ store });
+      if (text) setMessage({ text, error: false });
+    } catch (e) {
+      setMessage({ text: e instanceof Error ? e.message : String(e), error: true });
+    } finally {
+      setRunning(false);
+    }
+  };
+  return (
+    <View style={styles.field}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ disabled: running, busy: running }}
+        disabled={running}
+        onPress={run}
+        style={[styles.button, running && styles.buttonDisabled]}>
+        <Text style={styles.buttonText}>{node.label}</Text>
+      </Pressable>
+      {message && <Text style={message.error ? styles.error : styles.hint}>{message.text}</Text>}
+    </View>
+  );
 }
 
 function useCollection(store: DataStore, collection: string): readonly DataRecord[] {
@@ -240,6 +294,7 @@ const styles = StyleSheet.create({
   text: { fontSize: 16, color: '#222' },
   label: { fontSize: 14, fontWeight: '600', color: '#333' },
   hint: { fontSize: 12, color: '#777' },
+  error: { fontSize: 13, color: '#b3261e' },
   field: { gap: 6 },
   scale: { flexDirection: 'row', gap: 8 },
   scaleEnds: { flexDirection: 'row', justifyContent: 'space-between' },

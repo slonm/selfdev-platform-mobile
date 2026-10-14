@@ -74,6 +74,8 @@ const nodeSchema = z.discriminatedUnion('type', [
     series: z.array(z.string()).min(1),
   }),
   z.strictObject({ type: z.literal('button'), label: z.string(), navigate: z.string() }),
+  /** Runs an action the app provides (see `AppAction`), e.g. importing a file. */
+  z.strictObject({ type: z.literal('action'), label: z.string(), action: z.string() }),
 ]);
 
 const screenSchema = z.strictObject({ title: z.string(), body: z.array(nodeSchema) });
@@ -105,8 +107,11 @@ export type UserLayer = z.infer<typeof userLayerSchema>;
 export type ValidationError = { path: (string | number)[]; message: string };
 export type ValidationResult = { ok: true; layer: UserLayer } | { ok: false; errors: ValidationError[] };
 
-/** Checks a candidate user layer; errors carry the JSON path of the offending value. */
-export function validateLayer(input: unknown): ValidationResult {
+/**
+ * Checks a candidate user layer; errors carry the JSON path of the offending value. `actions` are
+ * the names of the app's actions; an `action` node naming anything else is rejected.
+ */
+export function validateLayer(input: unknown, opts: { actions?: readonly string[] } = {}): ValidationResult {
   const parsed = userLayerSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -120,11 +125,11 @@ export function validateLayer(input: unknown): ValidationResult {
       }),
     };
   }
-  const errors = checkReferences(parsed.data);
+  const errors = checkReferences(parsed.data, opts.actions ?? []);
   return errors.length ? { ok: false, errors } : { ok: true, layer: parsed.data };
 }
 
-function checkReferences(layer: UserLayer): ValidationError[] {
+function checkReferences(layer: UserLayer, actions: readonly string[]): ValidationError[] {
   const errors: ValidationError[] = [];
   const fail = (path: (string | number)[], message: string) => errors.push({ path, message });
   const hasScreen = (id: string) => Object.hasOwn(layer.screens, id);
@@ -152,6 +157,10 @@ function checkReferences(layer: UserLayer): ValidationError[] {
   for (const [screenId, screen] of Object.entries(layer.screens)) {
     screen.body.forEach((node, n) => {
       const at = ['screens', screenId, 'body', n];
+      if (node.type === 'action') {
+        if (!actions.includes(node.action)) fail([...at, 'action'], `the app has no action "${node.action}"`);
+        return;
+      }
       if (node.type === 'button') {
         if (!hasScreen(node.navigate)) fail([...at, 'navigate'], `no screen "${node.navigate}"`);
         return;

@@ -220,6 +220,28 @@ describe('validateLayer', () => {
     ]);
   });
 
+  describe('action buttons', () => {
+    function withAction(action: string): any {
+      const layer = sampleLayer();
+      layer.screens.history.body.push({ type: 'action', label: 'Import', action });
+      return layer;
+    }
+
+    it('accepts a button running an action the app provides', () => {
+      expect(validateLayer(withAction('importNight'), { actions: ['importNight'] }).ok).toBe(true);
+    });
+
+    it('rejects an action the app does not provide', () => {
+      const r = validateLayer(withAction('formatPhone'), { actions: ['importNight'] });
+
+      expect(r.ok ? [] : r.errors.map((e) => e.path)).toEqual([['screens', 'history', 'body', 2, 'action']]);
+    });
+
+    it('knows no actions unless the app declares them', () => {
+      expect(errorPaths(withAction('importNight'))).toEqual([['screens', 'history', 'body', 2, 'action']]);
+    });
+  });
+
   describe('computed collections', () => {
     function withComputed(): any {
       const layer = sampleLayer();

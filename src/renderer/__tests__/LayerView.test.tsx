@@ -171,6 +171,54 @@ describe('LayerView', () => {
     expect(height('mood 0')).toBeLessThan(height('mood 2'));
   });
 
+  describe('action buttons', () => {
+    function actionLayer(): UserLayer {
+      return {
+        ...sampleLayer,
+        screens: { ...sampleLayer.screens, about: { title: 'About', body: [{ type: 'action', label: 'Import', action: 'importNight' }] } },
+      };
+    }
+
+    it('runs the app action with the data store and shows its message', async () => {
+      const store = createMemoryStore(() => 1);
+      const actions = {
+        importNight: {
+          description: 'imports a night',
+          run: async (ctx: { store: typeof store }) => {
+            ctx.store.add('diary', { mood: 1 });
+            return 'Imported 1 night';
+          },
+        },
+      };
+      const user = userEvent.setup();
+      await render(<LayerView layer={actionLayer()} store={store} actions={actions} />);
+      await user.press(screen.getByRole('tab', { name: 'About' }));
+
+      await user.press(screen.getByRole('button', { name: 'Import' }));
+
+      expect(await screen.findByText('Imported 1 night')).toBeOnTheScreen();
+      expect(store.list('diary')).toHaveLength(1);
+    });
+
+    it('shows the error of a failing action instead of crashing', async () => {
+      const actions = {
+        importNight: {
+          description: 'x',
+          run: async () => {
+            throw new Error('no file chosen');
+          },
+        },
+      };
+      const user = userEvent.setup();
+      await render(<LayerView layer={actionLayer()} store={createMemoryStore()} actions={actions} />);
+      await user.press(screen.getByRole('tab', { name: 'About' }));
+
+      await user.press(screen.getByRole('button', { name: 'Import' }));
+
+      expect(await screen.findByText(/no file chosen/)).toBeOnTheScreen();
+    });
+  });
+
   it('shows records added elsewhere without a reload', async () => {
     const { store, user } = await setup();
     await user.press(screen.getByRole('button', { name: 'History' }));

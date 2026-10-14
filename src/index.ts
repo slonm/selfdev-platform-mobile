@@ -4,6 +4,7 @@ export * from './agent/layer-tools';
 export * from './agent/loop';
 export * from './agent/provider';
 export * from './agent/system-prompt';
+export * from './capabilities/actions';
 export * from './capabilities/reminders';
 export * from './data/computed-store';
 export * from './data/memory-store';
