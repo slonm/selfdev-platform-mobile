@@ -20,8 +20,11 @@ export type History<T> = {
   safeMode: boolean;
 };
 
-/** Launches that may start without completing before safe mode is entered. */
-const MAX_UNFINISHED_LAUNCHES = 2;
+/**
+ * Unfinished launches, counting the one starting now, that trigger safe mode: two launches crashed
+ * and a third begins.
+ */
+const MAX_UNFINISHED_LAUNCHES = 3;
 
 export function createHistory<T>(content: T): History<T> {
   return { versions: [content], accepted: [0], preview: null, lastGood: null, unfinishedLaunches: 0, safeMode: false };
@@ -73,7 +76,10 @@ export function launchStarted<T>(h: History<T>): History<T> {
   return { ...h, unfinishedLaunches };
 }
 
-/** Records that the rendered version launched successfully; it becomes the safe-mode fallback. */
+/**
+ * Records that the rendered version launched successfully. Only a version the user accepted becomes
+ * the safe-mode fallback: a preview that launched fine is still not chosen by the user.
+ */
 export function launchSucceeded<T>(h: History<T>): History<T> {
-  return { ...h, unfinishedLaunches: 0, lastGood: renderedId(h) };
+  return { ...h, unfinishedLaunches: 0, lastGood: h.preview === null ? renderedId(h) : h.lastGood };
 }

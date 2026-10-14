@@ -29,8 +29,11 @@ const scriptSchema = z.strictObject({
   tests: z.array(z.strictObject({ name: z.string(), input: z.unknown(), expect: z.unknown() })).min(1),
 });
 
+/** A scale is a row of buttons; more than this many no longer fit a phone screen. */
+const MAX_SCALE_STEPS = 11;
+
 const scaleSchema = z
-  .object({
+  .strictObject({
     type: z.literal('scale'),
     field: z.string(),
     label: z.string(),
@@ -39,7 +42,11 @@ const scaleSchema = z
     minLabel: z.string().optional(),
     maxLabel: z.string().optional(),
   })
-  .refine((s) => s.min < s.max, { path: ['max'], message: 'max must be greater than min' });
+  .refine((s) => s.min < s.max, { path: ['max'], message: 'max must be greater than min' })
+  .refine((s) => s.max - s.min < MAX_SCALE_STEPS, {
+    path: ['max'],
+    message: `a scale has at most ${MAX_SCALE_STEPS} steps`,
+  });
 
 const textInputSchema = z.strictObject({
   type: z.literal('textInput'),
@@ -167,17 +174,22 @@ function checkReferences(layer: UserLayer): ValidationError[] {
               [...at, 'fields', f, 'field'],
               got ? `"${input.field}" is ${got}, ${input.type} needs ${want}` : `no field "${input.field}"`
             );
+          } else if (node.fields.findIndex((other) => other.field === input.field) < f) {
+            fail([...at, 'fields', f, 'field'], `"${input.field}" already has an input in this form`);
           }
         });
       } else if (node.type === 'chart') {
         node.series.forEach((field, s) => {
           if (fieldType(node.collection, field) !== 'number') {
             fail([...at, 'series', s], `"${field}" is not a number field of "${node.collection}"`);
+          } else if (node.series.indexOf(field) < s) {
+            fail([...at, 'series', s], `"${field}" is already plotted`);
           }
         });
       } else {
         node.fields.forEach((field, f) => {
           if (!fieldType(node.collection, field)) fail([...at, 'fields', f], `no field "${field}"`);
+          else if (node.fields.indexOf(field) < f) fail([...at, 'fields', f], `"${field}" is already listed`);
         });
       }
     });

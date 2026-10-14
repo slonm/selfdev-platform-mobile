@@ -7,6 +7,7 @@ import {
   propose,
   rendered,
   undo,
+  type History,
 } from '../history';
 
 describe('user-layer history', () => {
@@ -52,20 +53,25 @@ describe('user-layer history', () => {
     expect(rendered(h)).toBe('v1');
   });
 
-  it('enters safe mode on the last version that launched, after two launches that never finished', () => {
+  /** Simulates n app launches that start rendering and crash before finishing. */
+  function crash<T>(h: History<T>, n: number): History<T> {
+    for (let i = 0; i < n; i++) h = launchStarted(h);
+    // the launch after the last crash starts too
+    return launchStarted(h);
+  }
+
+  it('enters safe mode on the last good version after two crashed launches', () => {
     let h = createHistory('v1');
     h = launchSucceeded(launchStarted(h)); // v1 is known to work
-    h = accept(propose(h, 'v2'));
-    h = launchStarted(h); // crash
-    h = launchStarted(h); // crash again
+    h = crash(accept(propose(h, 'v2')), 2);
 
     expect(h.safeMode).toBe(true);
     expect(rendered(h)).toBe('v1');
   });
 
-  it('tolerates a single unfinished launch', () => {
+  it('tolerates a single crashed launch', () => {
     let h = launchSucceeded(launchStarted(createHistory('v1')));
-    h = launchStarted(accept(propose(h, 'v2')));
+    h = crash(accept(propose(h, 'v2')), 1);
 
     expect(h.safeMode).toBe(false);
     expect(rendered(h)).toBe('v2');
@@ -73,14 +79,23 @@ describe('user-layer history', () => {
 
   it('applies the crash rule to a preview too', () => {
     let h = launchSucceeded(launchStarted(createHistory('v1')));
-    h = launchStarted(launchStarted(propose(h, 'v2')));
+    h = crash(propose(h, 'v2'), 2);
+
+    expect(rendered(h)).toBe('v1');
+  });
+
+  it('never falls back to a preview the user did not accept, even one that launched', () => {
+    let h = launchSucceeded(launchStarted(createHistory('v1')));
+    h = launchSucceeded(launchStarted(propose(h, 'agent draft')));
+    h = accept(propose(discard(h), 'v2'));
+    h = crash(h, 2);
 
     expect(rendered(h)).toBe('v1');
   });
 
   it('leaves safe mode once a change is accepted after it', () => {
     let h = launchSucceeded(launchStarted(createHistory('v1')));
-    h = launchStarted(launchStarted(accept(propose(h, 'v2'))));
+    h = crash(accept(propose(h, 'v2')), 2);
     h = accept(propose(h, 'v3'));
 
     expect(h.safeMode).toBe(false);

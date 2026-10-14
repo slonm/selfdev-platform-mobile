@@ -119,7 +119,8 @@ describe('validateLayer', () => {
 
   it('rejects a scale bound to a text field', () => {
     const layer = sampleLayer();
-    layer.screens.today.body[1].fields[0].field = 'note';
+    layer.collections.diary.fields.title = { type: 'text' };
+    layer.screens.today.body[1].fields[0].field = 'title';
 
     expect(errorPaths(layer)).toEqual([['screens', 'today', 'body', 1, 'fields', 0, 'field']]);
   });
@@ -177,6 +178,46 @@ describe('validateLayer', () => {
     layer.screens.today.body[0].colour = 'red';
 
     expect(errorPaths(layer)).toEqual([['screens', 'today', 'body', 0, 'colour'], ['remniders']]);
+  });
+
+  it('rejects an unknown property on a scale too', () => {
+    const layer = sampleLayer();
+    layer.screens.today.body[1].fields[0].minlabel = 'low';
+
+    expect(errorPaths(layer)).toEqual([['screens', 'today', 'body', 1, 'fields', 0, 'minlabel']]);
+  });
+
+  it('rejects a scale with more than 11 steps', () => {
+    const layer = sampleLayer();
+    layer.screens.today.body[1].fields[0].max = 11;
+
+    expect(errorPaths(layer)).toEqual([['screens', 'today', 'body', 1, 'fields', 0, 'max']]);
+  });
+
+  it('accepts a scale of exactly 11 steps', () => {
+    const layer = sampleLayer();
+    layer.screens.today.body[1].fields[0].max = 10;
+
+    expect(validateLayer(layer).ok).toBe(true);
+  });
+
+  it('rejects a form with two inputs for the same field', () => {
+    const layer = sampleLayer();
+    layer.collections.diary.fields.energy = { type: 'number' };
+    layer.screens.today.body[1].fields.push({ type: 'scale', field: 'mood', label: 'Again', min: 0, max: 4 });
+
+    expect(errorPaths(layer)).toEqual([['screens', 'today', 'body', 1, 'fields', 2, 'field']]);
+  });
+
+  it('rejects a field repeated in chart series or list columns', () => {
+    const layer = sampleLayer();
+    layer.screens.history.body[0].series = ['mood', 'mood'];
+    layer.screens.history.body[1].fields = ['note', 'note'];
+
+    expect(errorPaths(layer)).toEqual([
+      ['screens', 'history', 'body', 0, 'series', 1],
+      ['screens', 'history', 'body', 1, 'fields', 1],
+    ]);
   });
 
   describe('computed collections', () => {

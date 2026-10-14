@@ -8,7 +8,8 @@ import type { AgentTool } from './loop';
 
 /** The user-layer format as JSON Schema, without the top-level `$schema` marker. */
 function layerJsonSchema(): Record<string, unknown> {
-  const { $schema: _ignored, ...schema } = z.toJSONSchema(userLayerSchema) as Record<string, unknown>;
+  // 'input' mode: the model writes input, and only this mode reflects what validation accepts.
+  const { $schema: _ignored, ...schema } = z.toJSONSchema(userLayerSchema, { io: 'input' }) as Record<string, unknown>;
   return schema;
 }
 
