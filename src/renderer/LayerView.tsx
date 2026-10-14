@@ -1,6 +1,7 @@
-import { useState, useSyncExternalStore } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { withComputed } from '../data/computed-store';
 import type { DataRecord, DataStore, FieldValue } from '../data/store';
 import type { UserLayer } from '../user-layer/document';
 
@@ -12,7 +13,11 @@ type NodeOf<T extends Node['type']> = Extract<Node, { type: T }>;
  * Draws a validated user layer: a tab bar over the layer's tabs, a stack of screens reached with
  * `button` nodes, and each node of the component kit bound to the data store.
  */
-export function LayerView({ layer, store }: { layer: UserLayer; store: DataStore }) {
+export function LayerView({ layer, store: baseStore }: { layer: UserLayer; store: DataStore }) {
+  const store = useMemo(
+    () => withComputed(baseStore, layer, { onError: (c, m) => console.warn(`computed collection "${c}": ${m}`) }),
+    [baseStore, layer]
+  );
   const [tab, setTab] = useState(0);
   const [stack, setStack] = useState<string[]>([]);
   const screenId = stack.at(-1) ?? layer.tabs[tab].screen;

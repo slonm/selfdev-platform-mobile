@@ -42,7 +42,13 @@ will receive).
   collections: { <name>: { fields: { <field>: { type: number | text } } } },
   screens:     { <id>: { title, body: [ node… ] } },
   tabs:        [ { screen, title } ],           // at least one
-  reminders?:  [ { id, time: "HH:MM", title, body? } ] }   // daily, ids unique
+  reminders?:  [ { id, time: "HH:MM", title, body? } ],    // daily, ids unique
+  scripts?:    { <name>: { source, tests: [ { name, input, expect } ] } } }   // ≥ 1 test each
+
+A collection with "compute": "<script>" is derived, read-only: main({ collections }) receives every
+stored collection as [{ createdAt, values }] and returns records of the same shape, restricted to
+the declared fields. Scripts are ES5 and run in JS-Interpreter (no host access, step limit). Their
+tests run before a proposal may preview; a broken result at runtime empties only that collection.
 ```
 
 | Node | Purpose |

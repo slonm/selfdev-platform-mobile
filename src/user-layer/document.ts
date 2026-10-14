@@ -14,6 +14,19 @@ const fieldSchema = z.strictObject({ type: z.enum(['number', 'text']) });
 const collectionSchema = z.strictObject({
   /** Field name → definition. Records also carry an implicit creation timestamp. */
   fields: z.record(z.string(), fieldSchema),
+  /**
+   * Name of a script that derives this collection from the stored ones; such a collection is
+   * read-only. The script's `main({ collections })` receives every stored collection as
+   * `[{ createdAt, values }]` and returns records of the same shape.
+   */
+  compute: z.string().optional(),
+});
+
+const scriptSchema = z.strictObject({
+  /** ES5 source defining `function main(input)`; runs in the sandbox (`src/scripts/sandbox.ts`). */
+  source: z.string(),
+  /** Examples `main(input)` must reproduce exactly; at least one, run before a version activates. */
+  tests: z.array(z.strictObject({ name: z.string(), input: z.unknown(), expect: z.unknown() })).min(1),
 });
 
 const scaleSchema = z
@@ -74,6 +87,8 @@ export const userLayerSchema = z.strictObject({
   tabs: z.array(z.strictObject({ screen: z.string(), title: z.string() })).min(1),
   /** Daily notifications; the platform keeps the OS schedule equal to this list. */
   reminders: z.array(reminderSchema).optional(),
+  /** Named scripts, used by computed collections. */
+  scripts: z.record(z.string(), scriptSchema).optional(),
 });
 
 export type Reminder = z.infer<typeof reminderSchema>;
@@ -121,6 +136,12 @@ function checkReferences(layer: UserLayer): ValidationError[] {
     reminderIds.add(r.id);
   });
 
+  for (const [name, c] of Object.entries(layer.collections)) {
+    if (c.compute !== undefined && !Object.hasOwn(layer.scripts ?? {}, c.compute)) {
+      fail(['collections', name, 'compute'], `no script "${c.compute}"`);
+    }
+  }
+
   for (const [screenId, screen] of Object.entries(layer.screens)) {
     screen.body.forEach((node, n) => {
       const at = ['screens', screenId, 'body', n];
@@ -131,6 +152,10 @@ function checkReferences(layer: UserLayer): ValidationError[] {
       if (node.type === 'text') return;
       if (!Object.hasOwn(layer.collections, node.collection)) {
         fail([...at, 'collection'], `no collection "${node.collection}"`);
+        return;
+      }
+      if (node.type === 'form' && layer.collections[node.collection].compute !== undefined) {
+        fail([...at, 'collection'], `"${node.collection}" is computed and cannot be written`);
         return;
       }
       if (node.type === 'form') {

@@ -2,6 +2,7 @@ import { act, render, screen, userEvent } from '@testing-library/react-native';
 
 import { sampleLayer } from '../../__fixtures__/sample-layer';
 import { createMemoryStore } from '../../data/memory-store';
+import type { UserLayer } from '../../user-layer/document';
 import { LayerView } from '../LayerView';
 
 async function setup() {
@@ -95,6 +96,29 @@ describe('LayerView', () => {
       'mood 1',
       'mood 4',
     ]);
+  });
+
+  it('charts a collection computed by a script', async () => {
+    const layer: UserLayer = {
+      ...sampleLayer,
+      collections: { ...sampleLayer.collections, doubled: { fields: { x: { type: 'number' } }, compute: 'double' } },
+      scripts: {
+        double: {
+          source:
+            'function main(i) { return i.collections.diary.map(function (r) { return { createdAt: r.createdAt, values: { x: r.values.mood * 2 } }; }); }',
+          tests: [{ name: 't', input: { collections: { diary: [] } }, expect: [] }],
+        },
+      },
+      screens: { ...sampleLayer.screens, about: { title: 'About', body: [{ type: 'chart', collection: 'doubled', series: ['x'] }] } },
+    };
+    const store = createMemoryStore(() => 1);
+    store.add('diary', { mood: 2 });
+    const user = userEvent.setup();
+    await render(<LayerView layer={layer} store={store} />);
+
+    await user.press(screen.getByRole('tab', { name: 'About' }));
+
+    expect(screen.getByLabelText('x 4')).toBeOnTheScreen();
   });
 
   it('shows records added elsewhere without a reload', async () => {

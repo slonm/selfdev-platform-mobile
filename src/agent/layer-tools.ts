@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import type { DataStore } from '../data/store';
+import { checkScripts } from '../scripts/check';
 import { userLayerSchema, validateLayer, type UserLayer } from '../user-layer/document';
 import { propose, rendered, type History } from '../user-layer/history';
 import type { AgentTool } from './loop';
@@ -33,8 +34,8 @@ export function createLayerTools(ctx: {
     {
       name: 'propose_layer',
       description:
-        'Proposes a complete new version of the user layer. It is validated first: on failure you get ' +
-        'the errors with JSON paths and nothing changes. On success the user sees it as a preview and ' +
+        'Proposes a complete new version of the user layer. It is validated first and every script ' +
+        'test is run: on failure you get the errors with JSON paths and nothing changes. On success the user sees it as a preview and ' +
         'decides to accept or discard it; you cannot accept it yourself.',
       inputSchema: { type: 'object', properties: { layer: layerJsonSchema() }, required: ['layer'] },
       async run(input) {
@@ -42,6 +43,8 @@ export function createLayerTools(ctx: {
         if (layer === undefined) return { content: 'missing "layer"', isError: true };
         const result = validateLayer(layer);
         if (!result.ok) return { content: JSON.stringify({ errors: result.errors }), isError: true };
+        const scriptErrors = checkScripts(result.layer);
+        if (scriptErrors.length) return { content: JSON.stringify({ errors: scriptErrors }), isError: true };
         ctx.setHistory(propose(ctx.getHistory(), result.layer));
         return { content: 'The proposal is now shown to the user as a preview.' };
       },

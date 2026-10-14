@@ -50,6 +50,23 @@ describe('layer tools', () => {
     expect(s.history().versions).toHaveLength(1);
   });
 
+  it('rejects a proposal whose script tests fail and changes nothing', async () => {
+    const s = session();
+    const withScript = {
+      ...sampleLayer,
+      collections: { ...sampleLayer.collections, avg: { fields: { mean: { type: 'number' } }, compute: 'avg' } },
+      scripts: {
+        avg: { source: 'function main() { return [1]; }', tests: [{ name: 'empty', input: {}, expect: [] }] },
+      },
+    };
+
+    const r = await s.run('propose_layer', { layer: withScript });
+
+    expect(r.isError).toBe(true);
+    expect(JSON.parse(r.content).errors.map((e: { path: unknown }) => e.path)).toEqual([['scripts', 'avg', 'tests', 0]]);
+    expect(s.history().versions).toHaveLength(1);
+  });
+
   it('rejects a call without a layer', async () => {
     const s = session();
 

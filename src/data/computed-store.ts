@@ -1,0 +1,74 @@
+import { runScript } from '../scripts/sandbox';
+import type { UserLayer } from '../user-layer/document';
+import type { DataRecord, DataStore, FieldValue } from './store';
+
+const EMPTY: readonly DataRecord[] = Object.freeze([]);
+
+/**
+ * Wraps a store so the layer's computed collections can be read like stored ones. A computed
+ * collection is produced by its script from all stored collections and recomputed only when one of
+ * them changes (list snapshots are compared by identity). Output that is not a list of
+ * `{ createdAt, values }` matching the declared fields is discarded: the collection reads as empty
+ * and `onError` names it, so a broken script degrades one chart instead of the app.
+ */
+export function withComputed(
+  base: DataStore,
+  layer: UserLayer,
+  opts: { onError?: (collection: string, message: string) => void } = {}
+): DataStore {
+  const stored = Object.keys(layer.collections).filter((n) => layer.collections[n].compute === undefined);
+  const cache = new Map<string, { inputs: readonly (readonly DataRecord[])[]; result: readonly DataRecord[] }>();
+  const isComputed = (name: string) =>
+    Object.hasOwn(layer.collections, name) && layer.collections[name].compute !== undefined;
+
+  return {
+    add(collection, values) {
+      if (isComputed(collection)) throw new Error(`"${collection}" is computed and read-only`);
+      return base.add(collection, values);
+    },
+    list(collection) {
+      if (!isComputed(collection)) return base.list(collection);
+      const inputs = stored.map((n) => base.list(n));
+      const hit = cache.get(collection);
+      if (hit && hit.inputs.every((list, i) => list === inputs[i])) return hit.result;
+
+      const def = layer.collections[collection];
+      const input = {
+        collections: Object.fromEntries(
+          stored.map((n, i) => [n, inputs[i].map(({ createdAt, values }) => ({ createdAt, values }))])
+        ),
+      };
+      const run = runScript(layer.scripts![def.compute!].source, input);
+      const checked = run.ok ? toRecords(collection, run.value, def.fields) : run.message;
+      let result: readonly DataRecord[] = EMPTY;
+      if (typeof checked === 'string') opts.onError?.(collection, checked);
+      else result = checked;
+      cache.set(collection, { inputs, result });
+      return result;
+    },
+    subscribe: base.subscribe,
+  };
+}
+
+function toRecords(
+  collection: string,
+  output: unknown,
+  fields: UserLayer['collections'][string]['fields']
+): readonly DataRecord[] | string {
+  if (!Array.isArray(output)) return 'script did not return a list';
+  const records: DataRecord[] = [];
+  for (const [i, item] of output.entries()) {
+    const { createdAt, values } = (item ?? {}) as { createdAt?: unknown; values?: unknown };
+    if (typeof createdAt !== 'number' || !Number.isFinite(createdAt)) return `item ${i}: createdAt must be a number`;
+    if (!values || typeof values !== 'object') return `item ${i}: values must be an object`;
+    for (const [field, v] of Object.entries(values)) {
+      const type = Object.hasOwn(fields, field) ? fields[field].type : undefined;
+      if (!type) return `item ${i}: undeclared field "${field}"`;
+      if (type === 'number' ? typeof v !== 'number' || !Number.isFinite(v) : typeof v !== 'string') {
+        return `item ${i}: "${field}" must be ${type}`;
+      }
+    }
+    records.push({ id: `${collection}-${i}`, createdAt, values: values as Record<string, FieldValue> });
+  }
+  return records;
+}

@@ -42,6 +42,7 @@
   "dependencies": {
     "@anthropic-ai/foundry-sdk": "^0.6.0",
     "@anthropic-ai/sdk": "^0.134.0",
+    "js-interpreter": "^6.0.2",
     "zod": "^4.6.7"
   }
 }

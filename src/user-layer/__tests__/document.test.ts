@@ -179,6 +179,47 @@ describe('validateLayer', () => {
     expect(errorPaths(layer)).toEqual([['screens', 'today', 'body', 0, 'colour'], ['remniders']]);
   });
 
+  describe('computed collections', () => {
+    function withComputed(): any {
+      const layer = sampleLayer();
+      layer.collections.moodAvg = { fields: { mean: { type: 'number' } }, compute: 'avg' };
+      layer.scripts = {
+        avg: {
+          source: 'function main(input) { return []; }',
+          tests: [{ name: 'empty', input: { collections: { diary: [] } }, expect: [] }],
+        },
+      };
+      layer.screens.history.body.push({ type: 'chart', collection: 'moodAvg', series: ['mean'] });
+      return layer;
+    }
+
+    it('accepts a collection computed by a script', () => {
+      expect(validateLayer(withComputed()).ok).toBe(true);
+    });
+
+    it('rejects a computed collection whose script does not exist', () => {
+      const layer = withComputed();
+      layer.collections.moodAvg.compute = 'missing';
+
+      expect(errorPaths(layer)).toEqual([['collections', 'moodAvg', 'compute']]);
+    });
+
+    it('rejects a form writing into a computed collection', () => {
+      const layer = withComputed();
+      layer.screens.today.body[1].collection = 'moodAvg';
+      layer.screens.today.body[1].fields = [{ type: 'scale', field: 'mean', label: 'm', min: 0, max: 4 }];
+
+      expect(errorPaths(layer)).toEqual([['screens', 'today', 'body', 1, 'collection']]);
+    });
+
+    it('rejects a script without tests', () => {
+      const layer = withComputed();
+      layer.scripts.avg.tests = [];
+
+      expect(errorPaths(layer)).toContainEqual(['scripts', 'avg', 'tests']);
+    });
+  });
+
   it('reports something readable for every error', () => {
     const r = validateLayer({ schemaVersion: 1 });
 
