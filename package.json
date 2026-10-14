@@ -9,12 +9,14 @@
   "exports": {
     ".": "./src/index.ts",
     "./expo": "./src/shell/expo-services.ts",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./metro": "./metro.js"
   },
   "files": [
     "src",
     "!src/**/__tests__",
-    "!src/__fixtures__"
+    "!src/__fixtures__",
+    "metro.js"
   ],
   "scripts": {
     "test": "node --disable-warning=ExperimentalWarning node_modules/jest/bin/jest.js",

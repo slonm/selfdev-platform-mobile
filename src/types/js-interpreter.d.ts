@@ -7,6 +7,8 @@ declare module 'js-interpreter' {
     step(): boolean;
     /** Completion value of the last expression statement. */
     value: unknown;
+    /** 0: regular expressions throw; 1: native; 2 (default): sandboxed via Web Workers or Node vm. */
+    REGEXP_MODE: 0 | 1 | 2;
     setProperty(obj: PseudoObject, name: string, value: unknown): void;
   }
 }

@@ -28,6 +28,9 @@ export function runScript(source: string, input: unknown, opts: { maxSteps?: num
     return { ok: false, error: 'error', message: describe(e) };
   }
 
+  // 0 = no regular expressions: native ones would run outside the step limit (catastrophic
+  // backtracking), and the sandboxed mode needs Node's vm module, which React Native lacks.
+  it.REGEXP_MODE = 0;
   const maxSteps = opts.maxSteps ?? DEFAULT_MAX_STEPS;
   try {
     for (let steps = 0; it.step(); steps++) {

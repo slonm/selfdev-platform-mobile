@@ -41,6 +41,12 @@ describe('runScript', () => {
     expect(runScript('var x = 1;', {})).toMatchObject({ ok: false, error: 'error' });
   });
 
+  it('refuses regular expressions, which could run unbounded outside the step limit', () => {
+    const r = runScript('function main() { return /a+$/.test("aaa"); }', {});
+
+    expect(r).toEqual({ ok: false, error: 'error', message: expect.stringMatching(/regular expressions/i) });
+  });
+
   it('exposes nothing of the host: no network, modules or process', () => {
     const r = runScript(
       'function main() { return [typeof fetch, typeof require, typeof process, typeof XMLHttpRequest].join(","); }',
