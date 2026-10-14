@@ -60,10 +60,20 @@ the structure. The kit grows by adding node types here, test-first.
 
 ## The on-device agent
 
-Claude API tool use inside the app. Tools: read/list/write user-layer documents, validate, run tests,
-preview, query the data schema (not the data itself unless the user allows it). Default model
-Sonnet 5.5; Haiku 5.5 for small edits. Requests the platform cannot satisfy (new component, new
-native capability) become an issue for the developer instead of a hack.
+A tool-use loop inside the app (`src/agent/loop.ts`) over a provider-neutral conversation model.
+Implemented tools (`src/agent/layer-tools.ts`):
+
+| Tool | Does |
+|---|---|
+| `read_layer` | the layer currently shown (incl. a pending preview) as JSON |
+| `propose_layer` | validates a complete new layer; errors come back with JSON paths, success opens a preview — only the user accepts |
+| `describe_data` | per collection: record count and last save time; never values |
+
+The layer format's JSON Schema (from the zod schema) is the input schema of `propose_layer`, so the
+model sees the format up front. The default system prompt (`src/agent/system-prompt.ts`) is extended
+by each app's guide. Planned: script tools and an on-device test runner (bootstrap step 6). Default
+model Sonnet 5.5; Haiku 5.5 for small edits. Requests the platform cannot satisfy (new component,
+new native capability) are answered plainly instead of worked around.
 
 ## Model providers
 
