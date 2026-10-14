@@ -128,10 +128,10 @@ function checkReferences(layer: UserLayer): ValidationError[] {
   const errors: ValidationError[] = [];
   const fail = (path: (string | number)[], message: string) => errors.push({ path, message });
   const hasScreen = (id: string) => Object.hasOwn(layer.screens, id);
-  const fieldType = (collection: string, field: string) =>
-    Object.hasOwn(layer.collections[collection].fields, field)
-      ? layer.collections[collection].fields[field].type
-      : undefined;
+  const fieldType = (collection: string, field: string) => {
+    const fields = Object.hasOwn(layer.collections, collection) ? layer.collections[collection]?.fields : undefined;
+    return fields && Object.hasOwn(fields, field) ? fields[field]?.type : undefined;
+  };
 
   layer.tabs.forEach((tab, i) => {
     if (!hasScreen(tab.screen)) fail(['tabs', i, 'screen'], `no screen "${tab.screen}"`);
@@ -161,7 +161,7 @@ function checkReferences(layer: UserLayer): ValidationError[] {
         fail([...at, 'collection'], `no collection "${node.collection}"`);
         return;
       }
-      if (node.type === 'form' && layer.collections[node.collection].compute !== undefined) {
+      if (node.type === 'form' && layer.collections[node.collection]?.compute !== undefined) {
         fail([...at, 'collection'], `"${node.collection}" is computed and cannot be written`);
         return;
       }

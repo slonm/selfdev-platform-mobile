@@ -26,7 +26,7 @@ describe('SQLite data store', () => {
     const id = first.add('diary', { mood: 2 }).id;
     await first.flush();
 
-    expect((await openSqlStore(db)).list('diary')[0].id).toBe(id);
+    expect((await openSqlStore(db)).list('diary')[0]!.id).toBe(id);
   });
 
   it('shows an added record immediately, before it is written', async () => {

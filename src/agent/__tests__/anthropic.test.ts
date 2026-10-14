@@ -36,6 +36,11 @@ function fakeClient(response: Anthropic.Message) {
   return { client, sent };
 }
 
+const assistantRaw = [
+  { type: 'thinking', thinking: '', signature: 'sig' },
+  { type: 'tool_use', id: 'tu_1', name: 'read_layer', input: {} },
+];
+
 const request: CompletionRequest = {
   system: 'You edit layers.',
   tools: [{ name: 'read_layer', description: 'read', inputSchema: { type: 'object', properties: {} } }],
@@ -44,7 +49,7 @@ const request: CompletionRequest = {
     {
       role: 'assistant',
       content: [{ type: 'tool_call', id: 'tu_1', name: 'read_layer', input: {} }],
-      raw: [{ type: 'thinking', thinking: '', signature: 'sig' }, { type: 'tool_use', id: 'tu_1', name: 'read_layer', input: {} }],
+      raw: assistantRaw,
     },
     { role: 'user', content: [{ type: 'tool_result', callId: 'tu_1', content: 'bad', isError: true }] },
   ],
@@ -62,11 +67,11 @@ describe('Anthropic provider', () => {
       tools: [{ name: 'read_layer', description: 'read', input_schema: { type: 'object', properties: {} } }],
       messages: [
         { role: 'user', content: [{ type: 'text', text: 'add a field' }] },
-        { role: 'assistant', content: request.messages[1].role === 'assistant' ? request.messages[1].raw : null },
+        { role: 'assistant', content: assistantRaw },
         { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tu_1', content: 'bad', is_error: true }] },
       ],
     });
-    expect(sent[0].max_tokens).toBeGreaterThan(0);
+    expect(sent[0]!.max_tokens).toBeGreaterThan(0);
   });
 
   it('caches the stable prefix of the conversation', async () => {
@@ -74,7 +79,7 @@ describe('Anthropic provider', () => {
 
     await createAnthropicProvider({ client, model: 'm' }).complete(request);
 
-    expect(sent[0].cache_control).toEqual({ type: 'ephemeral' });
+    expect(sent[0]!.cache_control).toEqual({ type: 'ephemeral' });
   });
 
   it('builds assistant content from neutral blocks when no raw form was kept', async () => {
@@ -89,7 +94,7 @@ describe('Anthropic provider', () => {
       ],
     });
 
-    expect(sent[0].messages[1].content).toEqual([
+    expect(sent[0]!.messages[1]!.content).toEqual([
       { type: 'text', text: 'a' },
       { type: 'tool_use', id: 't', name: 'x', input: { k: 1 } },
     ]);

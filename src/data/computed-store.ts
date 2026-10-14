@@ -16,30 +16,36 @@ export function withComputed(
   layer: UserLayer,
   opts: { onError?: (collection: string, message: string) => void } = {}
 ): DataStore {
-  const stored = Object.keys(layer.collections).filter((n) => layer.collections[n].compute === undefined);
+  const stored = Object.entries(layer.collections)
+    .filter(([, c]) => c.compute === undefined)
+    .map(([n]) => n);
   const cache = new Map<string, { inputs: readonly (readonly DataRecord[])[]; result: readonly DataRecord[] }>();
-  const isComputed = (name: string) =>
-    Object.hasOwn(layer.collections, name) && layer.collections[name].compute !== undefined;
+  /** The collection's definition and script when it is computed; undefined for stored or unknown names. */
+  const computed = (name: string) => {
+    const def = Object.hasOwn(layer.collections, name) ? layer.collections[name] : undefined;
+    const script = def?.compute !== undefined ? layer.scripts?.[def.compute] : undefined;
+    return def && script ? { def, script } : undefined;
+  };
 
   return {
     add(collection, values) {
-      if (isComputed(collection)) throw new Error(`"${collection}" is computed and read-only`);
+      if (computed(collection)) throw new Error(`"${collection}" is computed and read-only`);
       return base.add(collection, values);
     },
     list(collection) {
-      if (!isComputed(collection)) return base.list(collection);
+      const c = computed(collection);
+      if (!c) return base.list(collection);
       const inputs = stored.map((n) => base.list(n));
       const hit = cache.get(collection);
       if (hit && hit.inputs.every((list, i) => list === inputs[i])) return hit.result;
 
-      const def = layer.collections[collection];
       const input = {
         collections: Object.fromEntries(
-          stored.map((n, i) => [n, inputs[i].map(({ createdAt, values }) => ({ createdAt, values }))])
+          stored.map((n, i) => [n, (inputs[i] ?? []).map(({ createdAt, values }) => ({ createdAt, values }))])
         ),
       };
-      const run = runScript(layer.scripts![def.compute!].source, input);
-      const checked = run.ok ? toRecords(collection, run.value, def.fields) : run.message;
+      const run = runScript(c.script.source, input);
+      const checked = run.ok ? toRecords(collection, run.value, c.def.fields) : run.message;
       let result: readonly DataRecord[] = EMPTY;
       if (typeof checked === 'string') opts.onError?.(collection, checked);
       else result = checked;
@@ -62,7 +68,7 @@ function toRecords(
     if (typeof createdAt !== 'number' || !Number.isFinite(createdAt)) return `item ${i}: createdAt must be a number`;
     if (!values || typeof values !== 'object') return `item ${i}: values must be an object`;
     for (const [field, v] of Object.entries(values)) {
-      const type = Object.hasOwn(fields, field) ? fields[field].type : undefined;
+      const type = Object.hasOwn(fields, field) ? fields[field]?.type : undefined;
       if (!type) return `item ${i}: undeclared field "${field}"`;
       if (type === 'number' ? typeof v !== 'number' || !Number.isFinite(v) : typeof v !== 'string') {
         return `item ${i}: "${field}" must be ${type}`;

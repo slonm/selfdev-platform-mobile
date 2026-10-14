@@ -50,7 +50,7 @@ describe('runAgent', () => {
     const r = await runAgent({ provider, system: 's', tools: [echo], messages: user('go') });
 
     expect(r.stop).toBe('done');
-    expect(requests[1].messages.at(-1)).toEqual({
+    expect(requests[1]!.messages.at(-1)).toEqual({
       role: 'user',
       content: [{ type: 'tool_result', callId: 'c1', content: '{"v":7}' }],
     });
@@ -62,7 +62,7 @@ describe('runAgent', () => {
 
     await runAgent({ provider, system: 's', tools: [echo], messages: user('go') });
 
-    const last = requests[1].messages.at(-1)!;
+    const last = requests[1]!.messages.at(-1)!;
     expect(last.content.map((b) => (b.type === 'tool_result' ? b.callId : b.type))).toEqual(['a', 'b']);
   });
 
@@ -72,7 +72,7 @@ describe('runAgent', () => {
     const r = await runAgent({ provider, system: 's', tools: [], messages: user('go') });
 
     expect(r.stop).toBe('done');
-    expect(requests[1].messages.at(-1)!.content[0]).toMatchObject({ type: 'tool_result', callId: 'c1', isError: true });
+    expect(requests[1]!.messages.at(-1)!.content[0]).toMatchObject({ type: 'tool_result', callId: 'c1', isError: true });
   });
 
   it('turns a throwing tool into an error result carrying the message', async () => {
@@ -83,7 +83,7 @@ describe('runAgent', () => {
 
     await runAgent({ provider, system: 's', tools: [boom], messages: user('go') });
 
-    expect(requests[1].messages.at(-1)!.content[0]).toEqual({
+    expect(requests[1]!.messages.at(-1)!.content[0]).toEqual({
       type: 'tool_result',
       callId: 'c1',
       content: 'disk full',
@@ -151,7 +151,7 @@ describe('runAgent', () => {
 
     await runAgent({ provider, system: 's', tools: [], messages: user('go') });
 
-    expect(requests[1].messages.at(-1)!.role).toBe('assistant');
+    expect(requests[1]!.messages.at(-1)!.role).toBe('assistant');
   });
 
   it('offers the tool specifications to the model without their implementations', async () => {
@@ -160,7 +160,7 @@ describe('runAgent', () => {
 
     await runAgent({ provider, system: 'sys', tools: [echo], messages: user('go') });
 
-    expect(requests[0].system).toBe('sys');
-    expect(requests[0].tools).toEqual([{ name: 'echo', description: 'echo', inputSchema: { type: 'object' } }]);
+    expect(requests[0]!.system).toBe('sys');
+    expect(requests[0]!.tools).toEqual([{ name: 'echo', description: 'echo', inputSchema: { type: 'object' } }]);
   });
 });

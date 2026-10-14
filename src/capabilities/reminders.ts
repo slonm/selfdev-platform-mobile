@@ -20,7 +20,9 @@ export interface Notifier {
 export async function syncReminders(reminders: Reminder[] | undefined, notifier: Notifier): Promise<void> {
   await notifier.cancelAll();
   for (const r of reminders ?? []) {
-    const [hour, minute] = r.time.split(':').map(Number);
+    // Validated as HH:MM.
+    const hour = Number(r.time.slice(0, 2));
+    const minute = Number(r.time.slice(3, 5));
     await notifier.scheduleDaily({ id: r.id, hour, minute, title: r.title, body: r.body });
   }
 }

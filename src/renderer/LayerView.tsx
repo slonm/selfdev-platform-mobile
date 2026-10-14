@@ -23,10 +23,12 @@ export function LayerView({ layer, store: baseStore }: { layer: UserLayer; store
   // The layer can change under the view (preview, accept, undo): never point past it.
   const tab = tabState < layer.tabs.length ? tabState : 0;
   const stack = stackState.filter((id) => Object.hasOwn(layer.screens, id));
-  const screenId = stack.at(-1) ?? layer.tabs[tab].screen;
-  const current = layer.screens[screenId];
+  const screenId = stack.at(-1) ?? layer.tabs[tab]?.screen;
+  const current = screenId === undefined ? undefined : layer.screens[screenId];
   const navigate = (id: string) => setStack([...stack, id]);
   const generation = layerGeneration(layer);
+  // Unreachable for a validated layer (at least one tab, tabs point at screens).
+  if (!current) return null;
 
   return (
     <View style={styles.root}>

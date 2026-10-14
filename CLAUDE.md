@@ -42,5 +42,10 @@ All three gates must be green before a change is done.
 ## Gotchas
 
 - TypeScript 6 defaults `types` to `[]`; `tsconfig.json` lists `jest` explicitly.
+- `noUncheckedIndexedAccess` is on: indexing a record or array yields `T | undefined`. In production
+  code handle the missing case explicitly (no `!`); in tests `!` is fine because absence fails the test.
+- Generate JSON Schema from zod with `io: 'input'`: the default output mode marks plain `z.object` as
+  closed and hides non-strict objects (`src/user-layer/__tests__/strict-schema.test.ts`).
+- `npm test` runs jest with `--disable-warning=ExperimentalWarning` (storage tests use `node:sqlite`).
 - `.claude/` is re-included by `.gitignore` (`!.claude/`) because the author's global gitignore
   excludes it; the TDD skill must ship with the repo so cloud Claude Code sessions follow it too.

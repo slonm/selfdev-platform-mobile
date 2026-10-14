@@ -33,12 +33,15 @@ export function createHistory<T>(content: T): History<T> {
 function renderedId<T>(h: History<T>): number {
   if (h.preview !== null) return h.preview;
   if (h.safeMode && h.lastGood !== null) return h.lastGood;
-  return h.accepted[h.accepted.length - 1];
+  return h.accepted.at(-1) ?? 0;
 }
 
 /** The content the app should show now: preview, else safe-mode fallback, else the active version. */
 export function rendered<T>(h: History<T>): T {
-  return h.versions[renderedId(h)];
+  const id = renderedId(h);
+  // Only a corrupted persisted history can point past its versions; fail loudly rather than render nothing.
+  if (id < 0 || id >= h.versions.length) throw new Error(`history refers to missing version ${id}`);
+  return h.versions[id] as T;
 }
 
 /** Adds a new version and starts previewing it; the active version is unchanged. */

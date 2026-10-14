@@ -127,7 +127,7 @@ describe('LayerView', () => {
       const { store, user } = await setup();
       await user.press(screen.getByRole('tab', { name: 'About' }));
 
-      await screen.rerender(<LayerView layer={{ ...sampleLayer, tabs: [sampleLayer.tabs[0]] }} store={store} />);
+      await screen.rerender(<LayerView layer={{ ...sampleLayer, tabs: [sampleLayer.tabs[0]!] }} store={store} />);
 
       expect(screen.getByRole('header', { name: 'Today' })).toBeOnTheScreen();
     });
@@ -136,7 +136,7 @@ describe('LayerView', () => {
       const { store, user } = await setup();
       await user.press(screen.getByRole('button', { name: 'History' }));
       const { history: _gone, ...screens } = sampleLayer.screens;
-      const today = { ...screens.today, body: screens.today.body.filter((n) => n.type !== 'button') };
+      const today = { ...screens.today!, body: screens.today!.body.filter((n) => n.type !== 'button') };
 
       await screen.rerender(<LayerView layer={{ ...sampleLayer, screens: { ...screens, today } }} store={store} />);
 
