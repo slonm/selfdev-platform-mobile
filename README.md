@@ -19,7 +19,22 @@ Design: [architecture](docs/architecture.md) · [user layer](docs/user-layer.md)
 [dev console](docs/dev-console.md) · [decisions](docs/decisions.md) ·
 [bootstrap plan](docs/bootstrap.md) · contributing: [CLAUDE.md](CLAUDE.md)
 
-Status: bootstrapping — user-layer version history implemented; see the bootstrap plan.
+Status: bootstrapping — the platform runs its first app (a mood and HRV diary) locally; device
+build in progress. See the bootstrap plan.
+
+## Use in an app
+
+```tsx
+import { SelfDevApp } from '@slonm/selfdev-platform-mobile';
+import { createExpoServices } from '@slonm/selfdev-platform-mobile/expo';
+
+const services = createExpoServices();
+export default () => <SelfDevApp defaultLayer={myLayer} services={services} actions={myActions} appGuide={guide} />;
+```
+
+`metro.config.js`: `module.exports = withSelfDevPlatform(getDefaultConfig(__dirname));`
+(`require('@slonm/selfdev-platform-mobile/metro')`). Peer dependencies: expo, react, react-native,
+expo-sqlite, expo-notifications, expo-secure-store.
 
 ## License
 
