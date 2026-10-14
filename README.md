@@ -1,16 +1,28 @@
 # selfdev-platform-mobile
 
-Building blocks for personal Android apps (Expo / React Native) that you change by asking an AI
-from inside the app, with the result delivered over the air — no reinstall.
+A thin platform for Android apps (Expo / React Native) that their users reshape by asking an AI —
+on the device, in seconds, without reinstalling.
 
-- **AI dev console** — a chat screen backed by the app's GitHub repository; Claude Code does the work
-  in GitHub Actions, test-first, and the change arrives as a preview update you try before accepting.
-- **Over-the-air updates** — preview / accept / undo, automatic rollback of a crashing update.
-- **Shared native capabilities** — storage, notifications, secure storage, background tasks.
+- **User layer** — screens, forms, schedules, charts and small scripts stored on the device as
+  versioned documents built from the platform's component kit; scripts run in a sandbox.
+- **On-device agent** — edits the user layer through validated tools, writes and runs tests before a
+  change activates; preview, accept, undo, and automatic safe mode if a version keeps crashing.
+- **Any AI provider** — Claude (direct, Microsoft Foundry, Bedrock, Vertex), OpenAI-compatible
+  services, or a hosted proxy; the user picks provider and payment.
+- **Developer loop** — for platform/app code and native changes: an in-app dev console backed by
+  the app's GitHub repository, Claude Code in GitHub Actions, over-the-air updates.
 
-Each app is its own repository and APK and depends on this package.
+Each app is its own repository and APK and depends on this package. First app: a Polar H10 HRV and
+mood diary.
 
-Design: [docs/architecture.md](docs/architecture.md) · [docs/dev-console.md](docs/dev-console.md) ·
-[docs/decisions.md](docs/decisions.md) · contributing: [CLAUDE.md](CLAUDE.md)
+Design: [architecture](docs/architecture.md) · [user layer](docs/user-layer.md) ·
+[dev console](docs/dev-console.md) · [decisions](docs/decisions.md) ·
+[bootstrap plan](docs/bootstrap.md) · contributing: [CLAUDE.md](CLAUDE.md)
 
-Status: design and scaffolding; no modules implemented yet.
+Status: bootstrapping — user-layer version history implemented; see the bootstrap plan.
+
+## License
+
+[Apache License 2.0](LICENSE). The bundled TDD skill in `.claude/skills/test-driven-development` is
+from [obra/superpowers](https://github.com/obra/superpowers) under the MIT license (see its own
+LICENSE file).
