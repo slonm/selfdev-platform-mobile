@@ -1,0 +1,8 @@
+node_modules/
+*.tsbuildinfo
+.expo/
+/tmp/
+
+# Project skills are versioned (author's global gitignore excludes .claude); local overrides are not
+!.claude/
+.claude/settings.local.json
