@@ -18,17 +18,21 @@ export function LayerView({ layer, store: baseStore }: { layer: UserLayer; store
     () => withComputed(baseStore, layer, { onError: (c, m) => console.warn(`computed collection "${c}": ${m}`) }),
     [baseStore, layer]
   );
-  const [tab, setTab] = useState(0);
-  const [stack, setStack] = useState<string[]>([]);
+  const [tabState, setTab] = useState(0);
+  const [stackState, setStack] = useState<string[]>([]);
+  // The layer can change under the view (preview, accept, undo): never point past it.
+  const tab = tabState < layer.tabs.length ? tabState : 0;
+  const stack = stackState.filter((id) => Object.hasOwn(layer.screens, id));
   const screenId = stack.at(-1) ?? layer.tabs[tab].screen;
   const current = layer.screens[screenId];
-  const navigate = (id: string) => setStack((s) => [...s, id]);
+  const navigate = (id: string) => setStack([...stack, id]);
+  const generation = layerGeneration(layer);
 
   return (
     <View style={styles.root}>
       <View style={styles.header}>
         {stack.length > 0 && (
-          <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => setStack((s) => s.slice(0, -1))}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => setStack(stack.slice(0, -1))}>
             <Text style={styles.back}>‹</Text>
           </Pressable>
         )}
@@ -38,7 +42,8 @@ export function LayerView({ layer, store: baseStore }: { layer: UserLayer; store
       </View>
       <ScrollView contentContainerStyle={styles.body}>
         {current.body.map((node, i) => (
-          <NodeView key={`${screenId}-${i}`} node={node} store={store} navigate={navigate} />
+          // A new layer remounts nodes, so form input made against the old one is dropped.
+          <NodeView key={`${generation}-${screenId}-${i}`} node={node} store={store} navigate={navigate} />
         ))}
       </ScrollView>
       <View style={styles.tabs}>
@@ -77,6 +82,16 @@ function NodeView({ node, store, navigate }: { node: Node; store: DataStore; nav
         </Pressable>
       );
   }
+}
+
+const generations = new WeakMap<UserLayer, number>();
+let nextGeneration = 0;
+
+/** A number that changes whenever a different layer object is shown. */
+function layerGeneration(layer: UserLayer): number {
+  let n = generations.get(layer);
+  if (n === undefined) generations.set(layer, (n = ++nextGeneration));
+  return n;
 }
 
 function useCollection(store: DataStore, collection: string): readonly DataRecord[] {
@@ -170,7 +185,14 @@ function ChartView({ node, store }: { node: NodeOf<'chart'>; store: DataStore })
     <View style={styles.card}>
       {node.series.map((field) => {
         const points = records.filter((r) => typeof r.values[field] === 'number');
-        const max = Math.max(1, ...points.map((r) => r.values[field] as number));
+        // Bars grow from the lowest value (or zero), so negatives stay distinguishable.
+        let lo = 0;
+        let hi = 0;
+        for (const r of points) {
+          lo = Math.min(lo, r.values[field] as number);
+          hi = Math.max(hi, r.values[field] as number);
+        }
+        const span = hi - lo || 1;
         return (
           <View key={field} style={styles.field}>
             <Text style={styles.label}>{field}</Text>
@@ -182,7 +204,7 @@ function ChartView({ node, store }: { node: NodeOf<'chart'>; store: DataStore })
                     key={r.id}
                     accessible
                     accessibilityLabel={`${field} ${v}`}
-                    style={[styles.bar, { height: Math.max(2, (v / max) * CHART_HEIGHT) }]}
+                    style={[styles.bar, { height: 2 + ((v - lo) / span) * (CHART_HEIGHT - 2) }]}
                   />
                 );
               })}

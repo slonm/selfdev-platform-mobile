@@ -1,4 +1,5 @@
 import { act, render, screen, userEvent } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 
 import { sampleLayer } from '../../__fixtures__/sample-layer';
 import { createMemoryStore } from '../../data/memory-store';
@@ -119,6 +120,55 @@ describe('LayerView', () => {
     await user.press(screen.getByRole('tab', { name: 'About' }));
 
     expect(screen.getByLabelText('x 4')).toBeOnTheScreen();
+  });
+
+  describe('when the layer changes (preview, accept, undo)', () => {
+    it('falls back to the first tab when the open tab no longer exists', async () => {
+      const { store, user } = await setup();
+      await user.press(screen.getByRole('tab', { name: 'About' }));
+
+      await screen.rerender(<LayerView layer={{ ...sampleLayer, tabs: [sampleLayer.tabs[0]] }} store={store} />);
+
+      expect(screen.getByRole('header', { name: 'Today' })).toBeOnTheScreen();
+    });
+
+    it('leaves a screen that no longer exists', async () => {
+      const { store, user } = await setup();
+      await user.press(screen.getByRole('button', { name: 'History' }));
+      const { history: _gone, ...screens } = sampleLayer.screens;
+      const today = { ...screens.today, body: screens.today.body.filter((n) => n.type !== 'button') };
+
+      await screen.rerender(<LayerView layer={{ ...sampleLayer, screens: { ...screens, today } }} store={store} />);
+
+      expect(screen.getByRole('header', { name: 'Today' })).toBeOnTheScreen();
+    });
+
+    it('drops form input made against the previous layer', async () => {
+      const { store, user } = await setup();
+      await user.press(screen.getByRole('button', { name: 'Mood 3' }));
+
+      await screen.rerender(<LayerView layer={structuredClone(sampleLayer)} store={store} />);
+      await user.press(screen.getByRole('button', { name: 'Save' }));
+
+      expect(store.list('diary')).toHaveLength(0);
+    });
+  });
+
+  it('keeps negative values distinguishable from zero on a chart', async () => {
+    const layer: UserLayer = {
+      ...sampleLayer,
+      screens: { ...sampleLayer.screens, about: { title: 'About', body: [{ type: 'chart', collection: 'diary', series: ['mood'] }] } },
+    };
+    const store = createMemoryStore(() => 1);
+    for (const mood of [-2, 0, 2]) store.add('diary', { mood });
+    const user = userEvent.setup();
+    await render(<LayerView layer={layer} store={store} />);
+    await user.press(screen.getByRole('tab', { name: 'About' }));
+
+    const height = (label: string) => StyleSheet.flatten(screen.getByLabelText(label).props.style).height as number;
+
+    expect(height('mood -2')).toBeLessThan(height('mood 0'));
+    expect(height('mood 0')).toBeLessThan(height('mood 2'));
   });
 
   it('shows records added elsewhere without a reload', async () => {

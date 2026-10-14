@@ -110,6 +110,39 @@ describe('runAgent', () => {
     expect((await runAgent({ provider, system: 's', tools: [], messages: user('go') })).stop).toBe('refusal');
   });
 
+  it.each(['max_tokens', 'refusal'] as const)(
+    'closes tool calls left open by a %s stop so the conversation can continue',
+    async (stop) => {
+      const { provider } = scriptedProvider([
+        () => ({
+          message: { role: 'assistant', content: [{ type: 'tool_call', id: 'c1', name: 'echo', input: {} }] },
+          stop,
+        }),
+      ]);
+      const echo = tool('echo', async () => ({ content: 'ran' }));
+
+      const r = await runAgent({ provider, system: 's', tools: [echo], messages: user('go') });
+
+      expect(r.stop).toBe(stop);
+      expect(r.messages.at(-1)).toEqual({
+        role: 'user',
+        content: [{ type: 'tool_result', callId: 'c1', content: expect.stringContaining('not run'), isError: true }],
+      });
+    }
+  );
+
+  it('treats a tool_calls stop without any call as finished', async () => {
+    const { provider, requests } = scriptedProvider([
+      () => ({ message: { role: 'assistant', content: [{ type: 'text', text: 'hm' }] }, stop: 'tool_calls' }),
+    ]);
+
+    const r = await runAgent({ provider, system: 's', tools: [], messages: user('go') });
+
+    expect(r.stop).toBe('done');
+    expect(requests).toHaveLength(1);
+    expect(r.messages.at(-1)!.role).toBe('assistant');
+  });
+
   it('continues a paused turn without inventing a user message', async () => {
     const { provider, requests } = scriptedProvider([
       () => ({ message: { role: 'assistant', content: [{ type: 'text', text: 'part' }] }, stop: 'paused' }),

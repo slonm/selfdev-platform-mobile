@@ -13,9 +13,13 @@ export type MemoryStoreOptions = {
 export function createMemoryStore(now: () => number = Date.now, options: MemoryStoreOptions = {}): DataStore {
   const collections = new Map<string, readonly DataRecord[]>();
   const listeners = new Set<() => void>();
+  const grouped = new Map<string, DataRecord[]>();
   for (const { collection, record } of options.initial ?? []) {
-    collections.set(collection, [...(collections.get(collection) ?? EMPTY), record]);
+    const list = grouped.get(collection);
+    if (list) list.push(record);
+    else grouped.set(collection, [record]);
   }
+  for (const [collection, list] of grouped) collections.set(collection, list);
 
   return {
     add(collection, values) {

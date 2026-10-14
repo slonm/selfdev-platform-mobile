@@ -30,14 +30,28 @@ export async function runAgent(opts: {
   for (let step = 0; step < (opts.maxSteps ?? DEFAULT_MAX_STEPS); step++) {
     const { message, stop } = await opts.provider.complete({ system: opts.system, messages, tools: specs });
     messages.push(message);
-    if (stop === 'end') return { messages, stop: 'done' };
-    if (stop === 'refusal' || stop === 'max_tokens') return { messages, stop };
+    const calls = message.content.filter((b) => b.type === 'tool_call');
     if (stop === 'paused') continue;
+    if (stop === 'refusal' || stop === 'max_tokens') {
+      // Every tool call needs a result before the conversation can be continued later.
+      if (calls.length) {
+        messages.push({
+          role: 'user',
+          content: calls.map((c) => ({
+            type: 'tool_result' as const,
+            callId: c.id,
+            content: `not run: the response ended (${stop})`,
+            isError: true,
+          })),
+        });
+      }
+      return { messages, stop };
+    }
+    if (stop === 'end' || calls.length === 0) return { messages, stop: 'done' };
 
     const results: ToolResult[] = [];
-    for (const block of message.content) {
-      if (block.type !== 'tool_call') continue;
-      results.push({ type: 'tool_result', callId: block.id, ...(await execute(byName.get(block.name), block)) });
+    for (const call of calls) {
+      results.push({ type: 'tool_result', callId: call.id, ...(await execute(byName.get(call.name), call)) });
     }
     messages.push({ role: 'user', content: results });
   }
