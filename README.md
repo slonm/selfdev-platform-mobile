@@ -34,7 +34,8 @@ export default () => <SelfDevApp defaultLayer={myLayer} services={services} acti
 
 `metro.config.js`: `module.exports = withSelfDevPlatform(getDefaultConfig(__dirname));`
 (`require('@slonm/selfdev-platform-mobile/metro')`). Peer dependencies: expo, react, react-native,
-expo-sqlite, expo-notifications, expo-secure-store.
+expo-sqlite, expo-notifications, expo-secure-store, expo-updates (update banner, restart, manual
+check; omit `useUpdates` from the services to build without it).
 
 ## License
 
