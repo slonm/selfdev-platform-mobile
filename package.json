@@ -29,7 +29,8 @@
     "react-native": "0.86.3",
     "expo-sqlite": "~57.0.4",
     "expo-notifications": "~57.0.23",
-    "expo-secure-store": "~57.0.4"
+    "expo-secure-store": "~57.0.4",
+    "expo-updates": "~57.0.26"
   },
   "devDependencies": {
     "@testing-library/react-native": "^14.1.0",
@@ -46,7 +47,8 @@
     "typescript": "~6.0.3",
     "expo-sqlite": "~57.0.4",
     "expo-notifications": "~57.0.23",
-    "expo-secure-store": "~57.0.4"
+    "expo-secure-store": "~57.0.4",
+    "expo-updates": "~57.0.26"
   },
   "jest": {
     "preset": "jest-expo"

@@ -8,7 +8,7 @@ import { openKeyValue } from '../../data/sql-store';
 import type { SqlDatabase } from '../../data/sql';
 import type { UserLayer } from '../../user-layer/document';
 import { accept, createHistory, propose } from '../../user-layer/history';
-import { SelfDevApp, type AiSettings, type PlatformServices } from '../SelfDevApp';
+import { SelfDevApp, type AiSettings, type PlatformServices, type UpdatesView } from '../SelfDevApp';
 
 const layer: UserLayer = {
   ...sampleLayer,
@@ -61,6 +61,67 @@ async function askAgent(user: ReturnType<typeof userEvent.setup>, text: string) 
   await user.type(screen.getByLabelText('Message'), text);
   await user.press(screen.getByRole('button', { name: 'Send' }));
 }
+
+describe('app updates', () => {
+  function withUpdates(view: Partial<UpdatesView>) {
+    const calls: string[] = [];
+    const s = services(nodeSqlite());
+    const updates: UpdatesView = {
+      status: 'idle',
+      check: async () => void calls.push('check'),
+      restart: async () => void calls.push('restart'),
+      ...view,
+    };
+    s.services.useUpdates = () => updates;
+    return { s, calls };
+  }
+
+  it('shows download progress of a found update', async () => {
+    const { s } = withUpdates({ status: 'downloading', progress: 0.42 });
+
+    await render(<SelfDevApp defaultLayer={layer} services={s.services} />);
+
+    expect(await screen.findByText(/42%/)).toBeOnTheScreen();
+  });
+
+  it('asks to restart once the update is downloaded, and restarts on request', async () => {
+    const { s, calls } = withUpdates({ status: 'ready' });
+    const user = userEvent.setup();
+    await render(<SelfDevApp defaultLayer={layer} services={s.services} />);
+
+    await user.press(await screen.findByRole('button', { name: 'Restart' }));
+
+    expect(calls).toEqual(['restart']);
+  });
+
+  it('checks for updates on request from the AI screen and reports an up-to-date app', async () => {
+    const { s, calls } = withUpdates({ status: 'idle' });
+    const user = userEvent.setup();
+    await render(<SelfDevApp defaultLayer={layer} services={s.services} />);
+    await user.press(await screen.findByRole('button', { name: 'AI' }));
+
+    await user.press(screen.getByRole('button', { name: 'Check for updates' }));
+
+    expect(calls).toEqual(['check']);
+    expect(await screen.findByText('The latest version is installed')).toBeOnTheScreen();
+  });
+
+  it('shows why a check failed', async () => {
+    const { s } = withUpdates({ status: 'error', error: 'network down' });
+
+    await render(<SelfDevApp defaultLayer={layer} services={s.services} />);
+
+    expect(await screen.findByText(/network down/)).toBeOnTheScreen();
+  });
+
+  it('offers no update check when the build has no update service', async () => {
+    const user = userEvent.setup();
+    await render(<SelfDevApp defaultLayer={layer} services={services(nodeSqlite()).services} />);
+    await user.press(await screen.findByRole('button', { name: 'AI' }));
+
+    expect(screen.queryByRole('button', { name: 'Check for updates' })).toBeNull();
+  });
+});
 
 describe('SelfDevApp', () => {
   it('boots into the default layer', async () => {

@@ -18,6 +18,17 @@ import { restoreHistory } from '../user-layer/restore';
 /** Which model service the agent uses; the API key is kept separately in secret storage. */
 export type AiSettings = { provider: 'anthropic' | 'foundry'; model: string; resource?: string };
 
+/**
+ * Over-the-air update state as the shell shows it. `check` looks for an update and downloads it;
+ * `restart` reloads the app into a downloaded update. `progress` is 0..1 while downloading.
+ */
+export type UpdatesView = {
+  status: 'unavailable' | 'idle' | 'checking' | 'downloading' | 'ready' | 'error';
+  progress?: number;
+  error?: string;
+  check(): Promise<void>;
+  restart(): Promise<void>;
+};
 export type SecretStore = { get(key: string): Promise<string | null>; set(key: string, value: string): Promise<void> };
 
 /** Device services the shell needs; `src/shell/expo-services.ts` provides the Expo implementations. */
@@ -26,7 +37,12 @@ export type PlatformServices = {
   notifier: Notifier;
   secrets: SecretStore;
   createProvider(settings: AiSettings, apiKey: string): ModelProvider;
+  /** React hook over the OTA update client; omitted when the build has none. Must be a stable function. */
+  useUpdates?: () => UpdatesView;
 };
+
+const NO_UPDATES: UpdatesView = { status: 'unavailable', check: async () => {}, restart: async () => {} };
+const useNoUpdates = () => NO_UPDATES;
 
 export const defaultStrings = {
   ai: 'AI',
@@ -46,6 +62,14 @@ export const defaultStrings = {
   foundry: 'Microsoft Foundry',
   save: 'Save',
   loading: 'Loading…',
+  updateDownloading: 'Downloading update…',
+  updateReady: 'Update downloaded — restart to apply it.',
+  restart: 'Restart',
+  updateError: 'Update failed:',
+  checkUpdates: 'Check for updates',
+  checkingUpdates: 'Checking for updates…',
+  upToDate: 'The latest version is installed',
+  updatesUnavailable: 'Updates are not available in this build',
 };
 export type ShellStrings = typeof defaultStrings;
 
@@ -84,6 +108,9 @@ export function SelfDevApp({
   const [failure, setFailure] = useState<string | null>(null);
   const [view, setView] = useState<'app' | 'agent'>('app');
   const launchMarked = useRef(false);
+  // `services` is stable for the app's lifetime, so the same hook runs on every render.
+  const useUpdates = services.useUpdates ?? useNoUpdates;
+  const updates = useUpdates();
 
   useEffect(() => {
     let cancelled = false;
@@ -143,11 +170,13 @@ export function SelfDevApp({
           appGuide={appGuide}
           actions={actions}
           strings={strings}
+          updates={services.useUpdates ? updates : null}
           onBack={() => setView('app')}
         />
       ) : (
         <>
           <View style={styles.bar}>
+            <UpdateBanner updates={updates} strings={strings} />
             {history.safeMode && <Text style={styles.notice}>{strings.safeMode}</Text>}
             {history.preview !== null && (
               <View style={styles.previewRow}>
@@ -166,7 +195,25 @@ export function SelfDevApp({
   );
 }
 
+function UpdateBanner({ updates, strings }: { updates: UpdatesView; strings: ShellStrings }) {
+  if (updates.status === 'downloading') {
+    const pct = updates.progress === undefined ? '' : ` ${Math.round(updates.progress * 100)}%`;
+    return <Text style={styles.notice}>{`${strings.updateDownloading}${pct}`}</Text>;
+  }
+  if (updates.status === 'ready') {
+    return (
+      <View style={styles.updateRow}>
+        <Text style={styles.updateText}>{strings.updateReady}</Text>
+        <SmallButton label={strings.restart} onPress={() => void updates.restart()} />
+      </View>
+    );
+  }
+  if (updates.status === 'error') return <Text style={styles.notice}>{`${strings.updateError} ${updates.error ?? ''}`}</Text>;
+  return null;
+}
+
 function AgentScreen(props: {
+  updates: UpdatesView | null;
   history: History<UserLayer>;
   setHistory: (h: History<UserLayer>) => void;
   booted: Booted;
@@ -183,6 +230,7 @@ function AgentScreen(props: {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [checkedByUser, setCheckedByUser] = useState(false);
   // Tools run while the agent works; they must see the latest history, not the one of the last render.
   const historyRef = useRef(props.history);
   useEffect(() => {
@@ -237,6 +285,19 @@ function AgentScreen(props: {
           <SmallButton label={strings.undo} onPress={() => props.setHistory(undo(props.history))} />
         )}
       </View>
+      {props.updates && (
+        <View style={styles.updateRow}>
+          <SmallButton
+            label={strings.checkUpdates}
+            disabled={props.updates.status === 'checking' || props.updates.status === 'downloading'}
+            onPress={() => {
+              setCheckedByUser(true);
+              void props.updates?.check();
+            }}
+          />
+          <Text style={styles.hint}>{updateStatusText(props.updates, checkedByUser, strings)}</Text>
+        </View>
+      )}
       {settings && apiKey === null ? (
         <SettingsForm
           initial={settings}
@@ -279,6 +340,23 @@ function AgentScreen(props: {
       )}
     </View>
   );
+}
+
+function updateStatusText(u: UpdatesView, checkedByUser: boolean, strings: ShellStrings): string {
+  switch (u.status) {
+    case 'checking':
+      return strings.checkingUpdates;
+    case 'downloading':
+      return u.progress === undefined ? strings.updateDownloading : `${strings.updateDownloading} ${Math.round(u.progress * 100)}%`;
+    case 'ready':
+      return strings.updateReady;
+    case 'error':
+      return `${strings.updateError} ${u.error ?? ''}`;
+    case 'unavailable':
+      return strings.updatesUnavailable;
+    case 'idle':
+      return checkedByUser ? strings.upToDate : '';
+  }
 }
 
 function SettingsForm({
@@ -352,6 +430,8 @@ const styles = StyleSheet.create({
   spacer: { flex: 1 },
   notice: { width: '100%', fontSize: 13, color: '#8a5a00', backgroundColor: '#fff4d6', padding: 8, borderRadius: 8 },
   previewRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  updateRow: { width: '100%', flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, paddingHorizontal: 12, paddingTop: 8 },
+  updateText: { flexShrink: 1, fontSize: 13, color: '#1d4fa8' },
   previewText: { fontSize: 14, fontWeight: '600', color: ACCENT },
   small: { minHeight: 40, paddingHorizontal: 14, borderRadius: 20, borderWidth: 1, borderColor: ACCENT, alignItems: 'center', justifyContent: 'center' },
   smallOn: { backgroundColor: ACCENT },
