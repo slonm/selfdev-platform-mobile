@@ -39,7 +39,8 @@ will receive).
 
 ```
 { schemaVersion: 1,
-  collections: { <name>: { fields: { <field>: { type: number | text } } } },
+  collections: { <name>: { fields: { <field>: { type: number | text, label?, unit?,
+                                              valueLabels?: { "<int>": text } /* number only */ } } } },
   screens:     { <id>: { title, body: [ node… ] } },
   tabs:        [ { screen, title } ],           // at least one
   reminders?:  [ { id, time: "HH:MM", title, body? } ],    // daily, ids unique
@@ -101,3 +102,9 @@ through the app. Tool use is required of a provider; the agent degrades to "expl
   to be decided by a prototype.
 - Store policy: interpreted JS is permitted on Google Play; AI-generated content rules apply to a
   public release.
+
+## Default layer updates
+
+An app update may ship a new default layer. On launch the shell compares it with the default seen
+last time (`default-layer` in the key-value table) and applies `adoptDefaultLayer`: an untouched
+layer switches to the new default (undo leads back), a changed one gets it as a preview.

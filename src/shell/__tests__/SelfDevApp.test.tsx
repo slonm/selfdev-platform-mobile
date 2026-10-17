@@ -78,6 +78,16 @@ describe('SelfDevApp', () => {
     expect(await screen.findByRole('tab', { name: 'Trends' })).toBeOnTheScreen();
   });
 
+  it('brings a new default layer from an app update to an install that never changed its layer', async () => {
+    const db = nodeSqlite();
+    await (await openKeyValue(db)).set('layer-history', createHistory(layer));
+
+    await render(<SelfDevApp defaultLayer={proposed} services={services(db).services} />);
+
+    expect(await screen.findByRole('tab', { name: 'Trends' })).toBeOnTheScreen();
+    await waitFor(async () => expect(await (await openKeyValue(db)).get('default-layer')).toEqual(proposed));
+  });
+
   it('counts a launch as complete once the screen has been laid out', async () => {
     const db = nodeSqlite();
     await render(<SelfDevApp defaultLayer={layer} services={services(db).services} />);

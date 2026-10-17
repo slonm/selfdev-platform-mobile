@@ -55,7 +55,14 @@ export function LayerView({
       <ScrollView contentContainerStyle={styles.body}>
         {current.body.map((node, i) => (
           // A new layer remounts nodes, so form input made against the old one is dropped.
-          <NodeView key={`${generation}-${screenId}-${i}`} node={node} store={store} navigate={navigate} actions={actions} />
+          <NodeView
+            key={`${generation}-${screenId}-${i}`}
+            node={node}
+            store={store}
+            navigate={navigate}
+            actions={actions}
+            collections={layer.collections}
+          />
         ))}
       </ScrollView>
       <View style={styles.tabs}>
@@ -82,21 +89,24 @@ function NodeView({
   store,
   navigate,
   actions,
+  collections,
 }: {
   node: Node;
   store: DataStore;
   navigate: (id: string) => void;
   actions: AppActions;
+  collections: UserLayer['collections'];
 }) {
+  const fields = 'collection' in node ? (collections[node.collection]?.fields ?? {}) : {};
   switch (node.type) {
     case 'text':
       return <Text style={styles.text}>{node.value}</Text>;
     case 'form':
-      return <FormView node={node} store={store} />;
+      return <FormView node={node} store={store} fields={fields} />;
     case 'list':
-      return <ListView node={node} store={store} />;
+      return <ListView node={node} store={store} fields={fields} />;
     case 'chart':
-      return <ChartView node={node} store={store} />;
+      return <ChartView node={node} store={store} fields={fields} />;
     case 'action':
       return <ActionButton node={node} store={store} actions={actions} />;
     case 'button':
@@ -154,7 +164,7 @@ function useCollection(store: DataStore, collection: string): readonly DataRecor
   return useSyncExternalStore(store.subscribe, () => store.list(collection));
 }
 
-function FormView({ node, store }: { node: NodeOf<'form'>; store: DataStore }) {
+function FormView({ node, store, fields }: { node: NodeOf<'form'>; store: DataStore; fields: Fields }) {
   const [values, setValues] = useState<Record<string, FieldValue>>({});
   const set = (field: string, value: FieldValue) => setValues((v) => ({ ...v, [field]: value }));
   const empty = Object.values(values).every((v) => v === '');
@@ -170,11 +180,13 @@ function FormView({ node, store }: { node: NodeOf<'form'>; store: DataStore }) {
                 <Pressable
                   key={v}
                   accessibilityRole="button"
-                  accessibilityLabel={`${input.label} ${v}`}
+                  accessibilityLabel={`${input.label} ${valueText(v, fields[input.field], false)}`}
                   accessibilityState={{ selected: values[input.field] === v }}
                   onPress={() => set(input.field, v)}
                   style={[styles.step, values[input.field] === v && styles.stepOn]}>
-                  <Text style={values[input.field] === v ? styles.stepTextOn : styles.stepText}>{v}</Text>
+                  <Text style={values[input.field] === v ? styles.stepTextOn : styles.stepText}>
+                    {valueText(v, fields[input.field], false)}
+                  </Text>
                 </Pressable>
               ))}
             </View>
@@ -213,19 +225,24 @@ function FormView({ node, store }: { node: NodeOf<'form'>; store: DataStore }) {
   );
 }
 
-function ListView({ node, store }: { node: NodeOf<'list'>; store: DataStore }) {
+function ListView({ node, store, fields }: { node: NodeOf<'list'>; store: DataStore; fields: Fields }) {
   const records = useCollection(store, node.collection);
   return (
     <View style={styles.card}>
       {[...records].reverse().map((r) => {
-        const label = `${formatTime(r.createdAt)} — ${node.fields
-          .filter((f) => r.values[f] !== undefined)
-          .map((f) => `${f}: ${r.values[f]}`)
-          .join(', ')}`;
+        const parts = node.fields.flatMap((f) => {
+          const v = r.values[f];
+          return v === undefined ? [] : [`${fields[f]?.label ?? f}: ${valueText(v, fields[f], true)}`];
+        });
         return (
-          <View key={r.id} testID="list-row" accessible accessibilityLabel={label} style={styles.row}>
+          <View
+            key={r.id}
+            testID="list-row"
+            accessible
+            accessibilityLabel={`${formatTime(r.createdAt)} — ${parts.join(', ')}`}
+            style={styles.row}>
             <Text style={styles.hint}>{formatTime(r.createdAt)}</Text>
-            <Text style={styles.text}>{node.fields.map((f) => r.values[f]).filter((v) => v !== undefined).join(' · ')}</Text>
+            <Text style={styles.text}>{parts.join(' · ')}</Text>
           </View>
         );
       })}
@@ -235,7 +252,7 @@ function ListView({ node, store }: { node: NodeOf<'list'>; store: DataStore }) {
 
 const CHART_HEIGHT = 80;
 
-function ChartView({ node, store }: { node: NodeOf<'chart'>; store: DataStore }) {
+function ChartView({ node, store, fields }: { node: NodeOf<'chart'>; store: DataStore; fields: Fields }) {
   const records = useCollection(store, node.collection);
   return (
     <View style={styles.card}>
@@ -251,7 +268,9 @@ function ChartView({ node, store }: { node: NodeOf<'chart'>; store: DataStore })
         const span = hi - lo || 1;
         return (
           <View key={field} style={styles.field}>
-            <Text style={styles.label}>{field}</Text>
+            <Text style={styles.label}>
+              {[fields[field]?.label ?? field, fields[field]?.unit].filter(Boolean).join(', ')}
+            </Text>
             <View style={[styles.bars, { height: CHART_HEIGHT }]}>
               {points.map((r) => {
                 const v = r.values[field] as number;
@@ -270,6 +289,15 @@ function ChartView({ node, store }: { node: NodeOf<'chart'>; store: DataStore })
       })}
     </View>
   );
+}
+
+type Fields = UserLayer['collections'][string]['fields'];
+
+/** A value as the user reads it: its value label if the field has one, else the value and unit. */
+function valueText(v: FieldValue, def: Fields[string] | undefined, withUnit: boolean): string {
+  const named = def?.type === 'number' ? def.valueLabels?.[String(v)] : undefined;
+  if (named !== undefined) return named;
+  return withUnit && def?.unit ? `${v} ${def.unit}` : String(v);
 }
 
 function range(min: number, max: number): number[] {

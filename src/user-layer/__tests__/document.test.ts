@@ -220,6 +220,30 @@ describe('validateLayer', () => {
     ]);
   });
 
+  describe('field labels', () => {
+    it('accepts a label and unit on any field, and value labels on a number field', () => {
+      const layer = sampleLayer();
+      layer.collections.diary.fields.mood = { type: 'number', label: 'Настроение', unit: 'балл', valueLabels: { '0': 'плохо', '4': 'отлично' } };
+      layer.collections.diary.fields.note = { type: 'text', label: 'Заметка' };
+
+      expect(validateLayer(layer).ok).toBe(true);
+    });
+
+    it('rejects value labels on a text field', () => {
+      const layer = sampleLayer();
+      layer.collections.diary.fields.note = { type: 'text', valueLabels: { '0': 'x' } };
+
+      expect(errorPaths(layer)).toEqual([['collections', 'diary', 'fields', 'note', 'valueLabels']]);
+    });
+
+    it('rejects a value label whose key is not a number', () => {
+      const layer = sampleLayer();
+      layer.collections.diary.fields.mood = { type: 'number', valueLabels: { yes: 'да' } };
+
+      expect(errorPaths(layer)).toEqual([['collections', 'diary', 'fields', 'mood', 'valueLabels', 'yes']]);
+    });
+  });
+
   describe('action buttons', () => {
     function withAction(action: string): any {
       const layer = sampleLayer();

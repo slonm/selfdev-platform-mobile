@@ -10,7 +10,8 @@ import { syncReminders, type Notifier } from '../capabilities/reminders';
 import type { SqlDatabase } from '../data/sql';
 import { openKeyValue, openSqlStore, type KeyValue, type SqlStore } from '../data/sql-store';
 import { LayerView } from '../renderer/LayerView';
-import type { UserLayer } from '../user-layer/document';
+import { adoptDefaultLayer } from '../user-layer/adopt-default';
+import { validateLayer, type UserLayer } from '../user-layer/document';
 import { accept, discard, launchStarted, launchSucceeded, rendered, undo, type History } from '../user-layer/history';
 import { restoreHistory } from '../user-layer/restore';
 
@@ -49,6 +50,8 @@ export const defaultStrings = {
 export type ShellStrings = typeof defaultStrings;
 
 const HISTORY_KEY = 'layer-history';
+/** The app's default layer as of the last launch, to notice when an update ships a new one. */
+const DEFAULT_KEY = 'default-layer';
 const SETTINGS_KEY = 'ai-settings';
 const SECRET_KEY = 'ai-api-key';
 const DEFAULT_SETTINGS: AiSettings = { provider: 'anthropic', model: 'claude-sonnet-5-5' };
@@ -87,9 +90,16 @@ export function SelfDevApp({
     (async () => {
       const db = await services.openDatabase();
       const [store, kv] = await Promise.all([openSqlStore(db), openKeyValue(db)]);
+      const opts = { actions: Object.keys(actions) };
+      const previousDefault = await kv.get(DEFAULT_KEY);
       const restored = launchStarted(
-        restoreHistory(await kv.get(HISTORY_KEY), defaultLayer, { actions: Object.keys(actions) })
+        adoptDefaultLayer(
+          restoreHistory(await kv.get(HISTORY_KEY), defaultLayer, opts),
+          defaultLayer,
+          validateLayer(previousDefault, opts).ok ? (previousDefault as UserLayer) : null
+        )
       );
+      await kv.set(DEFAULT_KEY, defaultLayer);
       if (cancelled) return;
       setBooted({ store, kv });
       setHistory(restored);

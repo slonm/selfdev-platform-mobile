@@ -219,6 +219,67 @@ describe('LayerView', () => {
     });
   });
 
+  describe('field presentation', () => {
+    const labelled: UserLayer = {
+      ...sampleLayer,
+      collections: {
+        diary: {
+          fields: {
+            mood: { type: 'number', label: 'Настроение', unit: 'балл' },
+            note: { type: 'text', label: 'Заметка' },
+            self: { type: 'number', label: 'Проснулся сам', valueLabels: { '0': 'нет', '1': 'да' } },
+          },
+        },
+      },
+      screens: {
+        ...sampleLayer.screens,
+        about: {
+          title: 'About',
+          body: [
+            {
+              type: 'form',
+              collection: 'diary',
+              submitLabel: 'Save',
+              fields: [{ type: 'scale', field: 'self', label: 'Проснулся сам', min: 0, max: 1 }],
+            },
+            { type: 'chart', collection: 'diary', series: ['mood'] },
+            { type: 'list', collection: 'diary', fields: ['mood', 'note', 'self'] },
+          ],
+        },
+      },
+    };
+
+    async function open(store = createMemoryStore(() => 1)) {
+      const user = userEvent.setup();
+      await render(<LayerView layer={labelled} store={store} />);
+      await user.press(screen.getByRole('tab', { name: 'About' }));
+      return { user, store };
+    }
+
+    it('titles a chart series with the field label and unit', async () => {
+      await open();
+
+      expect(screen.getByText('Настроение, балл')).toBeOnTheScreen();
+    });
+
+    it('shows list values with labels, units and value labels', async () => {
+      const store = createMemoryStore(() => 1);
+      store.add('diary', { mood: 3, note: 'ok', self: 1 });
+      await open(store);
+
+      expect(screen.getByText('Настроение: 3 балл · Заметка: ok · Проснулся сам: да')).toBeOnTheScreen();
+    });
+
+    it('puts value labels on scale buttons and saves the number', async () => {
+      const { user, store } = await open();
+
+      await user.press(screen.getByRole('button', { name: 'Проснулся сам да' }));
+      await user.press(screen.getByRole('button', { name: 'Save' }));
+
+      expect(store.list('diary').map((r) => r.values)).toEqual([{ self: 1 }]);
+    });
+  });
+
   it('shows records added elsewhere without a reload', async () => {
     const { store, user } = await setup();
     await user.press(screen.getByRole('button', { name: 'History' }));

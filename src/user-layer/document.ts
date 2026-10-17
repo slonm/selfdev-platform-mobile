@@ -9,7 +9,18 @@ import { z } from 'zod';
  * collections, fields), which a schema cannot express.
  */
 
-const fieldSchema = z.strictObject({ type: z.enum(['number', 'text']) });
+/** How a field is presented: `label` replaces the field name in charts and lists; `unit` follows values. */
+const presentation = { label: z.string().optional(), unit: z.string().optional() };
+
+const fieldSchema = z.discriminatedUnion('type', [
+  z.strictObject({
+    type: z.literal('number'),
+    ...presentation,
+    /** Text shown instead of a value, on scale buttons and in lists, e.g. { "0": "нет", "1": "да" }. */
+    valueLabels: z.record(z.string().regex(/^-?\d+$/, 'value labels are keyed by whole numbers'), z.string()).optional(),
+  }),
+  z.strictObject({ type: z.literal('text'), ...presentation }),
+]);
 
 const collectionSchema = z.strictObject({
   /** Field name → definition. Records also carry an implicit creation timestamp. */

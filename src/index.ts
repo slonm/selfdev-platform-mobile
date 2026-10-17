@@ -15,6 +15,7 @@ export * from './renderer/LayerView';
 export * from './shell/SelfDevApp';
 export * from './scripts/check';
 export * from './scripts/sandbox';
+export * from './user-layer/adopt-default';
 export * from './user-layer/document';
 export * from './user-layer/history';
 export * from './user-layer/restore';

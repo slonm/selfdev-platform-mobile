@@ -14,6 +14,8 @@ How to work:
   paths and submit again.
 - A successful proposal is a preview. The person accepts or discards it; you cannot. Say briefly
   what changed and what to look at.
+- Give fields a human label and, where it helps, a unit; for coded numbers (0/1, small scales)
+  add valueLabels so buttons and lists show words instead of digits.
 - Derived numbers (averages, flags, scores) are computed collections: a collection with
   "compute": "<script>" and a script whose ES5 source defines function main(input). input is
   { collections: { <stored name>: [{ createdAt, values }] } }; return [{ createdAt, values }] with
