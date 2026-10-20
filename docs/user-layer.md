@@ -55,7 +55,7 @@ tests run before a proposal may preview; a broken result at runtime empties only
 | Node | Purpose |
 |---|---|
 | `text` | static text |
-| `form` | adds a record to `collection`; inputs: `scale` (number field, integer `min` < `max`, optional end labels), `textInput` (text field, optional `multiline`) |
+| `form` | adds a record to `collection`; optional `action` runs an app action right after saving (one button answers and acts), `requireAll` keeps the button unavailable until every scale is answered; inputs: `scale` (number field, integer `min` < `max`, optional end labels), `textInput` (text field, optional `multiline`) |
 | `list` | records of `collection`, showing `fields` |
 | `chart` | number `series` of `collection` against record time |
 | `button` | `navigate` to a screen |

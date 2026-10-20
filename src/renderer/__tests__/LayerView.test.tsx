@@ -171,6 +171,70 @@ describe('LayerView', () => {
     expect(height('mood 0')).toBeLessThan(height('mood 2'));
   });
 
+  describe('a form that runs an action', () => {
+    function actingForm(): UserLayer {
+      const today = sampleLayer.screens.today!;
+      const form = today.body[1]!;
+      if (form.type !== 'form') throw new Error('fixture changed');
+      return {
+        ...sampleLayer,
+        screens: {
+          ...sampleLayer.screens,
+          today: { ...today, body: [{ ...form, submitLabel: 'End night', action: 'endNight', requireAll: true }] },
+        },
+      };
+    }
+
+    async function open(run: () => Promise<string | void>) {
+      const store = createMemoryStore(() => 1);
+      const ran: number[] = [];
+      const actions = {
+        endNight: {
+          description: 'x',
+          run: async (ctx: { store: typeof store }) => {
+            ran.push(ctx.store.list('diary').length);
+            return run();
+          },
+        },
+      };
+      const user = userEvent.setup();
+      await render(<LayerView layer={actingForm()} store={store} actions={actions} />);
+      return { store, ran, user };
+    }
+
+    it('keeps the button unavailable until every scale is answered, text being optional', async () => {
+      const { user } = await open(async () => 'ok');
+
+      await user.type(screen.getByLabelText('Note'), 'slept well');
+      expect(screen.getByRole('button', { name: 'End night' })).toBeDisabled();
+      await user.press(screen.getByRole('button', { name: 'Mood 3' }));
+      expect(screen.getByRole('button', { name: 'End night' })).toBeEnabled();
+    });
+
+    it('saves the answers, then runs the action and shows its message', async () => {
+      const { store, ran, user } = await open(async () => 'Night saved');
+
+      await user.press(screen.getByRole('button', { name: 'Mood 3' }));
+      await user.press(screen.getByRole('button', { name: 'End night' }));
+
+      expect(store.list('diary').map((r) => r.values)).toEqual([{ mood: 3 }]);
+      expect(ran).toEqual([1]); // the action already sees the saved record
+      expect(await screen.findByText('Night saved')).toBeOnTheScreen();
+    });
+
+    it('keeps the saved answers and shows the error when the action fails', async () => {
+      const { store, user } = await open(async () => {
+        throw new Error('sensor not found');
+      });
+
+      await user.press(screen.getByRole('button', { name: 'Mood 3' }));
+      await user.press(screen.getByRole('button', { name: 'End night' }));
+
+      expect(await screen.findByText(/sensor not found/)).toBeOnTheScreen();
+      expect(store.list('diary')).toHaveLength(1);
+    });
+  });
+
   describe('action buttons', () => {
     function actionLayer(): UserLayer {
       return {

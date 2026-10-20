@@ -76,6 +76,10 @@ const nodeSchema = z.discriminatedUnion('type', [
     collection: z.string(),
     submitLabel: z.string(),
     fields: z.array(inputSchema).min(1),
+    /** An app action run right after the record is saved, so one button answers and acts. */
+    action: z.string().optional(),
+    /** The button is available only once every scale has an answer; text inputs stay optional. */
+    requireAll: z.boolean().optional(),
   }),
   z.strictObject({ type: z.literal('list'), collection: z.string(), fields: z.array(z.string()).min(1) }),
   z.strictObject({
@@ -180,6 +184,9 @@ function checkReferences(layer: UserLayer, actions: readonly string[]): Validati
       if (!Object.hasOwn(layer.collections, node.collection)) {
         fail([...at, 'collection'], `no collection "${node.collection}"`);
         return;
+      }
+      if (node.type === 'form' && node.action !== undefined && !actions.includes(node.action)) {
+        fail([...at, 'action'], `the app has no action "${node.action}"`);
       }
       if (node.type === 'form' && layer.collections[node.collection]?.compute !== undefined) {
         fail([...at, 'collection'], `"${node.collection}" is computed and cannot be written`);

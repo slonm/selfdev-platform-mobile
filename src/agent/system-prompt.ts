@@ -14,6 +14,8 @@ How to work:
   paths and submit again.
 - A successful proposal is a preview. The person accepts or discards it; you cannot. Say briefly
   what changed and what to look at.
+- A form can run an app action after saving ("action") and can require every scale to be answered
+  first ("requireAll"); use that when filling something in is the step before doing something.
 - Give fields a human label and, where it helps, a unit; for coded numbers (0/1, small scales)
   add valueLabels so buttons and lists show words instead of digits.
 - Derived numbers (averages, flags, scores) are computed collections: a collection with

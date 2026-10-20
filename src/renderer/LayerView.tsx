@@ -102,7 +102,7 @@ function NodeView({
     case 'text':
       return <Text style={styles.text}>{node.value}</Text>;
     case 'form':
-      return <FormView node={node} store={store} fields={fields} />;
+      return <FormView node={node} store={store} fields={fields} actions={actions} />;
     case 'list':
       return <ListView node={node} store={store} fields={fields} />;
     case 'chart':
@@ -164,10 +164,43 @@ function useCollection(store: DataStore, collection: string): readonly DataRecor
   return useSyncExternalStore(store.subscribe, () => store.list(collection));
 }
 
-function FormView({ node, store, fields }: { node: NodeOf<'form'>; store: DataStore; fields: Fields }) {
+function FormView({
+  node,
+  store,
+  fields,
+  actions,
+}: {
+  node: NodeOf<'form'>;
+  store: DataStore;
+  fields: Fields;
+  actions: AppActions;
+}) {
   const [values, setValues] = useState<Record<string, FieldValue>>({});
+  const [running, setRunning] = useState(false);
+  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const set = (field: string, value: FieldValue) => setValues((v) => ({ ...v, [field]: value }));
   const empty = Object.values(values).every((v) => v === '');
+  const unanswered = !!node.requireAll && node.fields.some((i) => i.type === 'scale' && values[i.field] === undefined);
+  const blocked = empty || unanswered || running;
+
+  // Saves first, so the answers are kept even when the follow-up action fails.
+  const submit = async () => {
+    store.add(node.collection, Object.fromEntries(Object.entries(values).filter(([, v]) => v !== '')));
+    setValues({});
+    setMessage(null);
+    if (node.action === undefined) return;
+    const action = actions[node.action];
+    if (!action) return setMessage({ text: `No action "${node.action}"`, error: true });
+    setRunning(true);
+    try {
+      const text = await action.run({ store });
+      if (text) setMessage({ text, error: false });
+    } catch (e) {
+      setMessage({ text: e instanceof Error ? e.message : String(e), error: true });
+    } finally {
+      setRunning(false);
+    }
+  };
 
   return (
     <View style={styles.card}>
@@ -212,15 +245,13 @@ function FormView({ node, store, fields }: { node: NodeOf<'form'>; store: DataSt
       )}
       <Pressable
         accessibilityRole="button"
-        accessibilityState={{ disabled: empty }}
-        disabled={empty}
-        onPress={() => {
-          store.add(node.collection, Object.fromEntries(Object.entries(values).filter(([, v]) => v !== '')));
-          setValues({});
-        }}
-        style={[styles.button, empty && styles.buttonDisabled]}>
+        accessibilityState={{ disabled: blocked, busy: running }}
+        disabled={blocked}
+        onPress={submit}
+        style={[styles.button, blocked && styles.buttonDisabled]}>
         <Text style={styles.buttonText}>{node.submitLabel}</Text>
       </Pressable>
+      {message && <Text style={message.error ? styles.error : styles.hint}>{message.text}</Text>}
     </View>
   );
 }

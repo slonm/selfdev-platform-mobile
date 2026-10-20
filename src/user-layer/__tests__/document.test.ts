@@ -244,6 +244,24 @@ describe('validateLayer', () => {
     });
   });
 
+  describe('forms that run an action', () => {
+    it('accepts a form that runs an app action after saving and needs every scale answered', () => {
+      const layer = sampleLayer();
+      Object.assign(layer.screens.today.body[1], { action: 'importNight', requireAll: true });
+
+      expect(validateLayer(layer, { actions: ['importNight'] }).ok).toBe(true);
+    });
+
+    it('rejects a form running an action the app does not provide', () => {
+      const layer = sampleLayer();
+      layer.screens.today.body[1].action = 'deleteAll';
+
+      const r = validateLayer(layer, { actions: ['importNight'] });
+
+      expect(r.ok ? [] : r.errors.map((e) => e.path)).toEqual([['screens', 'today', 'body', 1, 'action']]);
+    });
+  });
+
   describe('action buttons', () => {
     function withAction(action: string): any {
       const layer = sampleLayer();
