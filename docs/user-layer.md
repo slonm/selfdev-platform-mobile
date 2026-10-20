@@ -60,6 +60,10 @@ tests run before a proposal may preview; a broken result at runtime empties only
 | `chart` | number `series` of `collection` against record time |
 | `button` | `navigate` to a screen |
 
+While an action runs (an `action` node, or a `form` with `action`), a spinner and the shell's
+`running` string stand under its button; then its message or error replaces them. The outcome is
+kept per node for as long as the layer is shown, so switching tabs mid-run does not lose it.
+
 Objects are strict: an unknown property (a typo such as `remniders`) is an error pointing at that
 property, never silently dropped. Validation reports every error with its JSON path; references (tabs/buttons → screens,
 form/list/chart → collections, inputs/columns/series → fields of the right type) are checked after

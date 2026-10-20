@@ -1,5 +1,5 @@
 import { useMemo, useState, useSyncExternalStore } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { AppActions } from '../capabilities/actions';
 import { withComputed } from '../data/computed-store';
@@ -18,11 +18,14 @@ export function LayerView({
   layer,
   store: baseStore,
   actions = {},
+  runningLabel = 'Working…',
 }: {
   layer: UserLayer;
   store: DataStore;
   /** App actions that `action` nodes may run. */
   actions?: AppActions;
+  /** Shown under a button while its action runs. */
+  runningLabel?: string;
 }) {
   const store = useMemo(
     () => withComputed(baseStore, layer, { onError: (c, m) => console.warn(`computed collection "${c}": ${m}`) }),
@@ -37,6 +40,20 @@ export function LayerView({
   const current = screenId === undefined ? undefined : layer.screens[screenId];
   const navigate = (id: string) => setStack([...stack, id]);
   const generation = layerGeneration(layer);
+  // Held here rather than in the node, so a run that finishes while another tab is open still reports.
+  const [runs, setRuns] = useState<Record<string, RunState>>({});
+  const runAction = async (key: string, name: string) => {
+    const update = (s: RunState) => setRuns((r) => ({ ...r, [key]: s }));
+    const action = actions[name];
+    if (!action) return update({ running: false, message: { text: `No action "${name}"`, error: true } });
+    update({ running: true });
+    try {
+      const text = await action.run({ store });
+      update({ running: false, message: text ? { text, error: false } : undefined });
+    } catch (e) {
+      update({ running: false, message: { text: e instanceof Error ? e.message : String(e), error: true } });
+    }
+  };
   // Unreachable for a validated layer (at least one tab, tabs point at screens).
   if (!current) return null;
 
@@ -53,17 +70,20 @@ export function LayerView({
         </Text>
       </View>
       <ScrollView contentContainerStyle={styles.body}>
-        {current.body.map((node, i) => (
+        {current.body.map((node, i) => {
           // A new layer remounts nodes, so form input made against the old one is dropped.
-          <NodeView
-            key={`${generation}-${screenId}-${i}`}
-            node={node}
-            store={store}
-            navigate={navigate}
-            actions={actions}
-            collections={layer.collections}
-          />
-        ))}
+          const key = `${generation}-${screenId}-${i}`;
+          return (
+            <NodeView
+              key={key}
+              node={node}
+              store={store}
+              navigate={navigate}
+              run={{ state: runs[key], start: (name) => void runAction(key, name), label: runningLabel }}
+              collections={layer.collections}
+            />
+          );
+        })}
       </ScrollView>
       <View style={styles.tabs}>
         {layer.tabs.map((t, i) => (
@@ -88,13 +108,13 @@ function NodeView({
   node,
   store,
   navigate,
-  actions,
+  run,
   collections,
 }: {
   node: Node;
   store: DataStore;
   navigate: (id: string) => void;
-  actions: AppActions;
+  run: Run;
   collections: UserLayer['collections'];
 }) {
   const fields = 'collection' in node ? (collections[node.collection]?.fields ?? {}) : {};
@@ -102,13 +122,13 @@ function NodeView({
     case 'text':
       return <Text style={styles.text}>{node.value}</Text>;
     case 'form':
-      return <FormView node={node} store={store} fields={fields} actions={actions} />;
+      return <FormView node={node} store={store} fields={fields} run={run} />;
     case 'list':
       return <ListView node={node} store={store} fields={fields} />;
     case 'chart':
       return <ChartView node={node} store={store} fields={fields} />;
     case 'action':
-      return <ActionButton node={node} store={store} actions={actions} />;
+      return <ActionButton node={node} run={run} />;
     case 'button':
       return (
         <Pressable accessibilityRole="button" onPress={() => navigate(node.navigate)} style={styles.button}>
@@ -128,34 +148,38 @@ function layerGeneration(layer: UserLayer): number {
   return n;
 }
 
-function ActionButton({ node, store, actions }: { node: NodeOf<'action'>; store: DataStore; actions: AppActions }) {
-  const [running, setRunning] = useState(false);
-  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
-  const run = async () => {
-    const action = actions[node.action];
-    if (!action) return setMessage({ text: `No action "${node.action}"`, error: true });
-    setRunning(true);
-    setMessage(null);
-    try {
-      const text = await action.run({ store });
-      if (text) setMessage({ text, error: false });
-    } catch (e) {
-      setMessage({ text: e instanceof Error ? e.message : String(e), error: true });
-    } finally {
-      setRunning(false);
-    }
-  };
+type RunState = { running: boolean; message?: { text: string; error: boolean } };
+
+/** A node's view of the action it runs: its latest state, how to start it, and the "running" wording. */
+type Run = { state: RunState | undefined; start: (action: string) => void; label: string };
+
+function RunStatus({ run }: { run: Run }) {
+  const { state } = run;
+  if (state?.running) {
+    return (
+      <View style={styles.running}>
+        <ActivityIndicator size="small" />
+        <Text style={styles.hint}>{run.label}</Text>
+      </View>
+    );
+  }
+  if (!state?.message) return null;
+  return <Text style={state.message.error ? styles.error : styles.hint}>{state.message.text}</Text>;
+}
+
+function ActionButton({ node, run }: { node: NodeOf<'action'>; run: Run }) {
+  const running = !!run.state?.running;
   return (
     <View style={styles.field}>
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ disabled: running, busy: running }}
         disabled={running}
-        onPress={run}
+        onPress={() => run.start(node.action)}
         style={[styles.button, running && styles.buttonDisabled]}>
         <Text style={styles.buttonText}>{node.label}</Text>
       </Pressable>
-      {message && <Text style={message.error ? styles.error : styles.hint}>{message.text}</Text>}
+      <RunStatus run={run} />
     </View>
   );
 }
@@ -168,38 +192,25 @@ function FormView({
   node,
   store,
   fields,
-  actions,
+  run,
 }: {
   node: NodeOf<'form'>;
   store: DataStore;
   fields: Fields;
-  actions: AppActions;
+  run: Run;
 }) {
   const [values, setValues] = useState<Record<string, FieldValue>>({});
-  const [running, setRunning] = useState(false);
-  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
+  const running = !!run.state?.running;
   const set = (field: string, value: FieldValue) => setValues((v) => ({ ...v, [field]: value }));
   const empty = Object.values(values).every((v) => v === '');
   const unanswered = !!node.requireAll && node.fields.some((i) => i.type === 'scale' && values[i.field] === undefined);
   const blocked = empty || unanswered || running;
 
   // Saves first, so the answers are kept even when the follow-up action fails.
-  const submit = async () => {
+  const submit = () => {
     store.add(node.collection, Object.fromEntries(Object.entries(values).filter(([, v]) => v !== '')));
     setValues({});
-    setMessage(null);
-    if (node.action === undefined) return;
-    const action = actions[node.action];
-    if (!action) return setMessage({ text: `No action "${node.action}"`, error: true });
-    setRunning(true);
-    try {
-      const text = await action.run({ store });
-      if (text) setMessage({ text, error: false });
-    } catch (e) {
-      setMessage({ text: e instanceof Error ? e.message : String(e), error: true });
-    } finally {
-      setRunning(false);
-    }
+    if (node.action !== undefined) run.start(node.action);
   };
 
   return (
@@ -251,7 +262,7 @@ function FormView({
         style={[styles.button, blocked && styles.buttonDisabled]}>
         <Text style={styles.buttonText}>{node.submitLabel}</Text>
       </Pressable>
-      {message && <Text style={message.error ? styles.error : styles.hint}>{message.text}</Text>}
+      <RunStatus run={run} />
     </View>
   );
 }
@@ -353,6 +364,7 @@ const styles = StyleSheet.create({
   text: { fontSize: 16, color: '#222' },
   label: { fontSize: 14, fontWeight: '600', color: '#333' },
   hint: { fontSize: 12, color: '#777' },
+  running: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   error: { fontSize: 13, color: '#b3261e' },
   field: { gap: 6 },
   scale: { flexDirection: 'row', gap: 8 },

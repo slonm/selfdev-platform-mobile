@@ -191,6 +191,26 @@ describe('SelfDevApp', () => {
     expect(await screen.findByRole('header', { name: 'Today' })).toBeOnTheScreen();
   });
 
+  it('says a layer action is running in the app\'s words', async () => {
+    const acting: UserLayer = {
+      ...layer,
+      screens: { ...layer.screens, today: { title: 'Today', body: [{ type: 'action', label: 'Sync', action: 'sync' }] } },
+    };
+    const actions = { sync: { description: 'x', run: () => new Promise<string>(() => {}) } };
+    await render(
+      <SelfDevApp
+        defaultLayer={acting}
+        services={services(nodeSqlite()).services}
+        actions={actions}
+        strings={{ running: 'Выполняется…' }}
+      />
+    );
+
+    fireEvent.press(await screen.findByRole('button', { name: 'Sync' }));
+
+    expect(await screen.findByText('Выполняется…')).toBeOnTheScreen();
+  });
+
   it('restores the layer saved by an earlier run', async () => {
     const db = nodeSqlite();
     await (await openKeyValue(db)).set('layer-history', accept(propose(createHistory(layer), proposed)));

@@ -233,6 +233,32 @@ describe('LayerView', () => {
       expect(await screen.findByText(/sensor not found/)).toBeOnTheScreen();
       expect(store.list('diary')).toHaveLength(1);
     });
+
+    it('says the action is running until it finishes', async () => {
+      let finish!: (text: string) => void;
+      const { user } = await open(() => new Promise<string>((resolve) => (finish = resolve)));
+
+      await user.press(screen.getByRole('button', { name: 'Mood 3' }));
+      await user.press(screen.getByRole('button', { name: 'End night' }));
+
+      expect(screen.getByText('Working…')).toBeOnTheScreen();
+      await act(async () => finish('Night saved'));
+      expect(screen.queryByText('Working…')).toBeNull();
+      expect(screen.getByText('Night saved')).toBeOnTheScreen();
+    });
+
+    it('keeps the outcome of an action that finished while another tab was open', async () => {
+      let finish!: (text: string) => void;
+      const { user } = await open(() => new Promise<string>((resolve) => (finish = resolve)));
+
+      await user.press(screen.getByRole('button', { name: 'Mood 3' }));
+      await user.press(screen.getByRole('button', { name: 'End night' }));
+      await user.press(screen.getByRole('tab', { name: 'About' }));
+      await act(async () => finish('Night saved'));
+      await user.press(screen.getByRole('tab', { name: 'Today' }));
+
+      expect(screen.getByText('Night saved')).toBeOnTheScreen();
+    });
   });
 
   describe('action buttons', () => {
@@ -280,6 +306,19 @@ describe('LayerView', () => {
       await user.press(screen.getByRole('button', { name: 'Import' }));
 
       expect(await screen.findByText(/no file chosen/)).toBeOnTheScreen();
+    });
+
+    it('says the action is running, in the words the app gives', async () => {
+      const actions = { importNight: { description: 'x', run: () => new Promise<string>(() => {}) } };
+      const user = userEvent.setup();
+      await render(
+        <LayerView layer={actionLayer()} store={createMemoryStore()} actions={actions} runningLabel="Выполняется…" />
+      );
+      await user.press(screen.getByRole('tab', { name: 'About' }));
+
+      await user.press(screen.getByRole('button', { name: 'Import' }));
+
+      expect(screen.getByText('Выполняется…')).toBeOnTheScreen();
     });
   });
 

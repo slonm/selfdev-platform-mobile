@@ -57,6 +57,8 @@ export const defaultStrings = {
   message: 'Message',
   send: 'Send',
   thinking: 'Working…',
+  /** Under a layer button while its action runs. */
+  running: 'Working…',
   apiKey: 'API key',
   model: 'Model',
   resource: 'Azure resource',
@@ -217,7 +219,7 @@ export function SelfDevApp({
             <View style={styles.spacer} />
             <SmallButton label={strings.ai} onPress={() => setView('agent')} />
           </View>
-          <LayerView layer={layer} store={booted.store} actions={actions} />
+          <LayerView layer={layer} store={booted.store} actions={actions} runningLabel={strings.running} />
         </>
       )}
     </View>
