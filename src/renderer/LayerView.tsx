@@ -269,9 +269,10 @@ function FormView({
 
 function ListView({ node, store, fields }: { node: NodeOf<'list'>; store: DataStore; fields: Fields }) {
   const records = useCollection(store, node.collection);
+  if (records.length === 0) return null;
   return (
-    <View style={styles.card}>
-      {[...records].reverse().map((r) => {
+    <View testID="list" style={styles.card}>
+      {[...records].reverse().slice(0, node.limit).map((r) => {
         const parts = node.fields.flatMap((f) => {
           const v = r.values[f];
           return v === undefined ? [] : [`${fields[f]?.label ?? f}: ${valueText(v, fields[f], true)}`];

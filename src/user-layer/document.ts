@@ -81,7 +81,13 @@ const nodeSchema = z.discriminatedUnion('type', [
     /** The button is available only once every scale has an answer; text inputs stay optional. */
     requireAll: z.boolean().optional(),
   }),
-  z.strictObject({ type: z.literal('list'), collection: z.string(), fields: z.array(z.string()).min(1) }),
+  z.strictObject({
+    type: z.literal('list'),
+    collection: z.string(),
+    fields: z.array(z.string()).min(1),
+    /** Shows only this many newest records, e.g. 1 for a status line. */
+    limit: z.int().positive().optional(),
+  }),
   z.strictObject({
     type: z.literal('chart'),
     collection: z.string(),

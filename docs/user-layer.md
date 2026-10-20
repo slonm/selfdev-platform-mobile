@@ -56,7 +56,7 @@ tests run before a proposal may preview; a broken result at runtime empties only
 |---|---|
 | `text` | static text |
 | `form` | adds a record to `collection`; optional `action` runs an app action right after saving (one button answers and acts), `requireAll` keeps the button unavailable until every scale is answered; inputs: `scale` (number field, integer `min` < `max`, optional end labels), `textInput` (text field, optional `multiline`) |
-| `list` | records of `collection`, showing `fields` |
+| `list` | records of `collection`, newest first, showing `fields`; optional `limit` keeps only that many newest (1 makes a status line); an empty list draws nothing |
 | `chart` | number `series` of `collection` against record time |
 | `button` | `navigate` to a screen |
 

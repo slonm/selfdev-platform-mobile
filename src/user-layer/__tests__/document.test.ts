@@ -142,6 +142,20 @@ describe('validateLayer', () => {
     ]);
   });
 
+  it('accepts a list limited to its newest records', () => {
+    const layer = sampleLayer();
+    layer.screens.history.body[1].limit = 1;
+
+    expect(errorPaths(layer)).toEqual([]);
+  });
+
+  it('rejects a list limit that is not a positive whole number', () => {
+    const layer = sampleLayer();
+    layer.screens.history.body[1].limit = 0;
+
+    expect(errorPaths(layer)).toEqual([['screens', 'history', 'body', 1, 'limit']]);
+  });
+
   it('rejects a list column its collection does not define', () => {
     const layer = sampleLayer();
     layer.screens.history.body[1].fields = ['mood', 'missing'];

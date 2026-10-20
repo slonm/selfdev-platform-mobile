@@ -86,6 +86,28 @@ describe('LayerView', () => {
     expect(rows).toEqual([expect.stringContaining('second'), expect.stringContaining('first')]);
   });
 
+  it('shows only the newest records of a limited list, and nothing for an empty one', async () => {
+    const latest: UserLayer = {
+      ...sampleLayer,
+      screens: { ...sampleLayer.screens, about: { title: 'About', body: [{ type: 'list', collection: 'diary', fields: ['note'], limit: 1 }] } },
+    };
+    const store = createMemoryStore(() => 1);
+    const user = userEvent.setup();
+    await render(<LayerView layer={latest} store={store} />);
+    await user.press(screen.getByRole('tab', { name: 'About' }));
+    expect(screen.queryAllByTestId('list-row')).toEqual([]);
+    expect(screen.queryByTestId('list')).toBeNull();
+
+    await act(async () => {
+      store.add('diary', { note: 'first' });
+      store.add('diary', { note: 'second' });
+    });
+
+    const rows = screen.getAllByTestId('list-row').map((r) => r.props.accessibilityLabel);
+    expect(rows).toEqual([expect.stringContaining('second')]);
+    expect(screen.getByTestId('list')).toBeOnTheScreen();
+  });
+
   it('plots one point per record for each chart series', async () => {
     const { store, user } = await setup();
     store.add('diary', { mood: 1 });
