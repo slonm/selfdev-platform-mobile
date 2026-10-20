@@ -84,10 +84,10 @@ describe('app updates', () => {
     expect(await screen.findByText(/42%/)).toBeOnTheScreen();
   });
 
-  it('asks to restart once the update is downloaded, and restarts on request', async () => {
+  it('asks to restart once a late update is downloaded, and restarts on request', async () => {
     const { s, calls } = withUpdates({ status: 'ready' });
     const user = userEvent.setup();
-    await render(<SelfDevApp defaultLayer={layer} services={s.services} />);
+    await render(<SelfDevApp defaultLayer={layer} services={s.services} autoRestartWindowMs={0} />);
 
     await user.press(await screen.findByRole('button', { name: 'Restart' }));
 
@@ -112,6 +112,57 @@ describe('app updates', () => {
     await render(<SelfDevApp defaultLayer={layer} services={s.services} />);
 
     expect(await screen.findByText(/network down/)).toBeOnTheScreen();
+  });
+
+  describe('automatic restart', () => {
+    /** An update service whose status the test moves, like expo-updates does on its own. */
+    function liveUpdates() {
+      const calls: string[] = [];
+      let status: UpdatesView['status'] = 'idle';
+      const s = services(nodeSqlite());
+      s.services.useUpdates = () => ({
+        status,
+        check: async () => void calls.push('check'),
+        restart: async () => void calls.push('restart'),
+      });
+      return { s, calls, set: (v: UpdatesView['status']) => (status = v) };
+    }
+
+    it('restarts by itself when an update finishes downloading right after launch', async () => {
+      const u = liveUpdates();
+      await render(<SelfDevApp defaultLayer={layer} services={u.s.services} autoRestartWindowMs={60_000} />);
+      await screen.findByRole('header', { name: 'Today' });
+
+      u.set('ready');
+      await screen.rerender(<SelfDevApp defaultLayer={layer} services={u.s.services} autoRestartWindowMs={60_000} />);
+
+      await waitFor(() => expect(u.calls).toEqual(['restart']));
+    });
+
+    it('waits for the user when an update arrives later, so nothing typed is lost', async () => {
+      const u = liveUpdates();
+      await render(<SelfDevApp defaultLayer={layer} services={u.s.services} autoRestartWindowMs={0} />);
+      await screen.findByRole('header', { name: 'Today' });
+
+      u.set('ready');
+      await screen.rerender(<SelfDevApp defaultLayer={layer} services={u.s.services} autoRestartWindowMs={0} />);
+
+      expect(await screen.findByRole('button', { name: 'Restart' })).toBeOnTheScreen();
+      expect(u.calls).toEqual([]);
+    });
+
+    it('restarts by itself after an update the user asked for', async () => {
+      const u = liveUpdates();
+      const user = userEvent.setup();
+      await render(<SelfDevApp defaultLayer={layer} services={u.s.services} autoRestartWindowMs={0} />);
+      await user.press(await screen.findByRole('button', { name: 'AI' }));
+      await user.press(screen.getByRole('button', { name: 'Check for updates' }));
+
+      u.set('ready');
+      await screen.rerender(<SelfDevApp defaultLayer={layer} services={u.s.services} autoRestartWindowMs={0} />);
+
+      await waitFor(() => expect(u.calls).toEqual(['check', 'restart']));
+    });
   });
 
   it('offers no update check when the build has no update service', async () => {

@@ -80,6 +80,7 @@ const SETTINGS_KEY = 'ai-settings';
 const SECRET_KEY = 'ai-api-key';
 const DEFAULT_SETTINGS: AiSettings = { provider: 'anthropic', model: 'claude-sonnet-5-5' };
 const NO_ACTIONS: AppActions = {};
+const AUTO_RESTART_WINDOW_MS = 20_000;
 
 type Booted = { store: SqlStore; kv: KeyValue };
 
@@ -95,12 +96,19 @@ export function SelfDevApp({
   appGuide,
   actions = NO_ACTIONS,
   strings: overrides,
+  autoRestartWindowMs = AUTO_RESTART_WINDOW_MS,
 }: {
   defaultLayer: UserLayer;
   services: PlatformServices;
   appGuide?: string;
   actions?: AppActions;
   strings?: Partial<ShellStrings>;
+  /**
+   * An update that finishes downloading within this time after launch is applied by restarting at
+   * once; a later one waits for the user's Restart, so nothing being typed is lost. An update the
+   * user asked for with "Check for updates" always restarts at once.
+   */
+  autoRestartWindowMs?: number;
 }) {
   const strings = { ...defaultStrings, ...overrides };
   const [booted, setBooted] = useState<Booted | null>(null);
@@ -111,6 +119,21 @@ export function SelfDevApp({
   // `services` is stable for the app's lifetime, so the same hook runs on every render.
   const useUpdates = services.useUpdates ?? useNoUpdates;
   const updates = useUpdates();
+  const launchedAt = useRef(0);
+  const restartRequested = useRef(false);
+  const restarting = useRef(false);
+
+  useEffect(() => {
+    launchedAt.current = Date.now();
+  }, []);
+
+  useEffect(() => {
+    if (updates.status !== 'ready' || restarting.current) return;
+    if (restartRequested.current || Date.now() - launchedAt.current < autoRestartWindowMs) {
+      restarting.current = true;
+      void updates.restart();
+    }
+  }, [updates, autoRestartWindowMs]);
 
   useEffect(() => {
     let cancelled = false;
@@ -171,6 +194,9 @@ export function SelfDevApp({
           actions={actions}
           strings={strings}
           updates={services.useUpdates ? updates : null}
+          onUserCheck={() => {
+            restartRequested.current = true;
+          }}
           onBack={() => setView('app')}
         />
       ) : (
@@ -214,6 +240,7 @@ function UpdateBanner({ updates, strings }: { updates: UpdatesView; strings: She
 
 function AgentScreen(props: {
   updates: UpdatesView | null;
+  onUserCheck: () => void;
   history: History<UserLayer>;
   setHistory: (h: History<UserLayer>) => void;
   booted: Booted;
@@ -292,6 +319,7 @@ function AgentScreen(props: {
             disabled={props.updates.status === 'checking' || props.updates.status === 'downloading'}
             onPress={() => {
               setCheckedByUser(true);
+              props.onUserCheck();
               void props.updates?.check();
             }}
           />
