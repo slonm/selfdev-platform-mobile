@@ -71,6 +71,7 @@ export function useExpoUpdates(): UpdatesView {
     status,
     progress: u.isDownloading ? u.downloadProgress : undefined,
     error: error ?? undefined,
+    version: versionText(u.currentlyRunning),
     async check() {
       setManualError(null);
       try {
@@ -82,6 +83,15 @@ export function useExpoUpdates(): UpdatesView {
     },
     restart: () => Updates.reloadAsync(),
   };
+}
+
+/** "DD.MM HH:mm · abcdef12" for a downloaded update, "built-in" for the JS shipped in the APK. */
+function versionText(running: Updates.CurrentlyRunningInfo): string {
+  if (running.isEmbeddedLaunch || !running.updateId) return 'built-in';
+  const d = running.createdAt;
+  const p = (n: number) => String(n).padStart(2, '0');
+  const when = d ? `${p(d.getDate())}.${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())} · ` : '';
+  return `${when}${running.updateId.slice(0, 8)}`;
 }
 
 function expoNotifier(channelName: string): Notifier {

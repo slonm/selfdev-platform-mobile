@@ -26,6 +26,8 @@ export type UpdatesView = {
   status: 'unavailable' | 'idle' | 'checking' | 'downloading' | 'ready' | 'error';
   progress?: number;
   error?: string;
+  /** Human-readable id of the running JS: when it was published and a short update id. */
+  version?: string;
   check(): Promise<void>;
   restart(): Promise<void>;
 };
@@ -70,6 +72,7 @@ export const defaultStrings = {
   checkingUpdates: 'Checking for updates…',
   upToDate: 'The latest version is installed',
   updatesUnavailable: 'Updates are not available in this build',
+  version: 'Version:',
 };
 export type ShellStrings = typeof defaultStrings;
 
@@ -324,6 +327,7 @@ function AgentScreen(props: {
             }}
           />
           <Text style={styles.hint}>{updateStatusText(props.updates, checkedByUser, strings)}</Text>
+          {props.updates.version && <Text style={styles.hint}>{`${strings.version} ${props.updates.version}`}</Text>}
         </View>
       )}
       {settings && apiKey === null ? (

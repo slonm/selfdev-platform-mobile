@@ -165,6 +165,16 @@ describe('app updates', () => {
     });
   });
 
+  it('shows which version of the app is running on the AI screen', async () => {
+    const { s } = withUpdates({ status: 'idle', version: '20.10 10:30 · 010a08f4' });
+    const user = userEvent.setup();
+    await render(<SelfDevApp defaultLayer={layer} services={s.services} />);
+
+    await user.press(await screen.findByRole('button', { name: 'AI' }));
+
+    expect(screen.getByText('Version: 20.10 10:30 · 010a08f4')).toBeOnTheScreen();
+  });
+
   it('offers no update check when the build has no update service', async () => {
     const user = userEvent.setup();
     await render(<SelfDevApp defaultLayer={layer} services={services(nodeSqlite()).services} />);
