@@ -169,6 +169,27 @@ describe('validateLayer', () => {
     expect(validateLayer(layer).ok).toBe(true);
   });
 
+  it('accepts a reminder skipped once its collection got a record shortly before it', () => {
+    const skipIfRecorded = { collection: 'diary', withinHours: 12 };
+    const layer = { ...sampleLayer(), reminders: [{ id: 'evening', time: '21:00', title: 'Diary', skipIfRecorded }] };
+
+    expect(errorPaths(layer)).toEqual([]);
+  });
+
+  it('rejects a reminder skip bound to a missing collection', () => {
+    const skipIfRecorded = { collection: 'missing', withinHours: 12 };
+    const layer = { ...sampleLayer(), reminders: [{ id: 'evening', time: '21:00', title: 'Diary', skipIfRecorded }] };
+
+    expect(errorPaths(layer)).toEqual([['reminders', 0, 'skipIfRecorded', 'collection']]);
+  });
+
+  it.each([0, 25])('rejects a reminder skip window of %s hours', (withinHours) => {
+    const skipIfRecorded = { collection: 'diary', withinHours };
+    const layer = { ...sampleLayer(), reminders: [{ id: 'evening', time: '21:00', title: 'Diary', skipIfRecorded }] };
+
+    expect(errorPaths(layer)).toEqual([['reminders', 0, 'skipIfRecorded', 'withinHours']]);
+  });
+
   it.each(['25:00', '21:60', '9:30', '21-00'])('rejects reminder time %s', (time) => {
     const layer = { ...sampleLayer(), reminders: [{ id: 'r', time, title: 'x' }] };
 

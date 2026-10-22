@@ -3,7 +3,7 @@ import { fireEvent, render, screen, userEvent, waitFor } from '@testing-library/
 import { nodeSqlite } from '../../__fixtures__/node-sqlite';
 import { sampleLayer } from '../../__fixtures__/sample-layer';
 import type { AssistantMessage, ModelProvider, StopReason } from '../../agent/provider';
-import type { DailyReminder, Notifier } from '../../capabilities/reminders';
+import { PLAN_DAYS, type DailyReminder, type Notifier, type OnceReminder } from '../../capabilities/reminders';
 import { openKeyValue } from '../../data/sql-store';
 import type { SqlDatabase } from '../../data/sql';
 import type { UserLayer } from '../../user-layer/document';
@@ -19,7 +19,7 @@ const proposed: UserLayer = { ...layer, tabs: [...layer.tabs, { screen: 'history
 type Turn = { message: AssistantMessage; stop: StopReason };
 
 function services(db: SqlDatabase, script: Turn[] = []) {
-  const scheduled: DailyReminder[][] = [];
+  const scheduled: (DailyReminder | OnceReminder)[][] = [];
   const secrets = new Map<string, string>();
   const providers: { settings: AiSettings; key: string }[] = [];
   let turn = 0;
@@ -28,6 +28,9 @@ function services(db: SqlDatabase, script: Turn[] = []) {
       scheduled.push([]);
     },
     async scheduleDaily(r) {
+      scheduled.at(-1)!.push(r);
+    },
+    async scheduleOnce(r) {
       scheduled.at(-1)!.push(r);
     },
   };
@@ -257,6 +260,24 @@ describe('SelfDevApp', () => {
     await render(<SelfDevApp defaultLayer={layer} services={s.services} />);
 
     await waitFor(() => expect(s.scheduled.at(-1)).toEqual([{ id: 'evening', hour: 21, minute: 0, title: 'Diary', body: undefined }]));
+  });
+
+  it('drops the coming reminder once the form it asks for is saved', async () => {
+    // A 24-hour window always holds a record saved now, whatever the time of day the test runs.
+    const skipping: UserLayer = {
+      ...layer,
+      reminders: [{ id: 'evening', time: '21:00', title: 'Diary', skipIfRecorded: { collection: 'diary', withinHours: 24 } }],
+    };
+    const s = services(nodeSqlite());
+    await render(<SelfDevApp defaultLayer={skipping} services={s.services} />);
+    await waitFor(() => expect(s.scheduled.at(-1)).toHaveLength(PLAN_DAYS));
+    const coming = s.scheduled.at(-1)![0];
+
+    await fireEvent.press(await screen.findByRole('button', { name: 'Mood 3' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(s.scheduled.at(-1)).toHaveLength(PLAN_DAYS - 1));
+    expect(s.scheduled.at(-1)).not.toContainEqual(coming);
   });
 
   it('asks for an API key before the agent can work, and keeps it in secret storage', async () => {

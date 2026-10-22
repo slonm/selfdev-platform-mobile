@@ -108,6 +108,13 @@ const reminderSchema = z.strictObject({
   time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'time must be HH:MM, 00:00-23:59'),
   title: z.string(),
   body: z.string().optional(),
+  /**
+   * Leaves out a day's reminder when `collection` got a record within `withinHours` before it,
+   * e.g. the diary reminder once the diary is already filled in.
+   */
+  skipIfRecorded: z
+    .strictObject({ collection: z.string(), withinHours: z.number().positive().max(24) })
+    .optional(),
 });
 
 export const userLayerSchema = z.strictObject({
@@ -167,6 +174,10 @@ function checkReferences(layer: UserLayer, actions: readonly string[]): Validati
   layer.reminders?.forEach((r, i) => {
     if (reminderIds.has(r.id)) fail(['reminders', i, 'id'], `duplicate reminder id "${r.id}"`);
     reminderIds.add(r.id);
+    const skip = r.skipIfRecorded?.collection;
+    if (skip !== undefined && !Object.hasOwn(layer.collections, skip)) {
+      fail(['reminders', i, 'skipIfRecorded', 'collection'], `no collection "${skip}"`);
+    }
   });
 
   for (const [name, c] of Object.entries(layer.collections)) {

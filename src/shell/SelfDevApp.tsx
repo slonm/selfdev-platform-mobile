@@ -11,7 +11,7 @@ import type { SqlDatabase } from '../data/sql';
 import { openKeyValue, openSqlStore, type KeyValue, type SqlStore } from '../data/sql-store';
 import { LayerView } from '../renderer/LayerView';
 import { adoptDefaultLayer } from '../user-layer/adopt-default';
-import { validateLayer, type UserLayer } from '../user-layer/document';
+import { validateLayer, type Reminder, type UserLayer } from '../user-layer/document';
 import { accept, discard, launchStarted, launchSucceeded, rendered, undo, type History } from '../user-layer/history';
 import { restoreHistory } from '../user-layer/restore';
 
@@ -171,12 +171,34 @@ export function SelfDevApp({
 
   const layer = history ? rendered(history) : null;
   const remindersKey = JSON.stringify(layer?.reminders ?? []);
+  const reminderSync = useRef(Promise.resolve());
   useEffect(() => {
-    if (!layer) return;
-    syncReminders(JSON.parse(remindersKey), services.notifier).catch((e: unknown) => console.error('reminders', e));
+    if (!layer || !booted) return;
+    const reminders: Reminder[] = JSON.parse(remindersKey);
+    const watched = reminders.flatMap((r) => (r.skipIfRecorded ? [r.skipIfRecorded.collection] : []));
+    // Resync only when a collection a reminder watches changed, not on every record of any kind.
+    const stamp = () =>
+      watched
+        .map((c) => {
+          const records = booted.store.list(c);
+          return `${records.length}:${records.at(-1)?.id ?? ''}`;
+        })
+        .join('|');
+    let synced: string | null = null;
+    const sync = () => {
+      const now = stamp();
+      if (now === synced) return;
+      synced = now;
+      // Chained, so a cancel-and-reschedule never interleaves with the previous one.
+      reminderSync.current = reminderSync.current
+        .then(() => syncReminders(reminders, services.notifier, { store: booted.store }))
+        .catch((e: unknown) => console.error('reminders', e));
+    };
+    sync();
+    return booted.store.subscribe(sync);
     // The layer object changes on every version; only a change of reminders needs a resync.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [remindersKey, services.notifier, layer !== null]);
+  }, [remindersKey, services.notifier, booted, layer !== null]);
 
   if (failure) return <Text style={styles.failure}>{failure}</Text>;
   if (!booted || !history || !layer) return <Text style={styles.loading}>{strings.loading}</Text>;

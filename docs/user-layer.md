@@ -43,8 +43,15 @@ will receive).
                                               valueLabels?: { "<int>": text } /* number only */ } } } },
   screens:     { <id>: { title, body: [ node… ] } },
   tabs:        [ { screen, title } ],           // at least one
-  reminders?:  [ { id, time: "HH:MM", title, body? } ],    // daily, ids unique
+  reminders?:  [ { id, time: "HH:MM", title, body?,          // daily, ids unique
+                   skipIfRecorded?: { collection, withinHours } } ],  // 0 < hours <= 24
   scripts?:    { <name>: { source, tests: [ { name, input, expect } ] } } }   // ≥ 1 test each
+
+A reminder with skipIfRecorded is left out on a day when `collection` already got a record within
+`withinHours` before it (the diary reminder after the diary is filled in). Android cannot drop one
+day of a repeating notification, so such a reminder is scheduled as one notification per day for
+the next 14 days (`PLAN_DAYS`), re-planned at launch and whenever that collection changes; an app
+left closed for longer stops reminding until it is opened.
 
 A collection with "compute": "<script>" is derived, read-only: main({ collections }) receives every
 stored collection as [{ createdAt, values }] and returns records of the same shape, restricted to

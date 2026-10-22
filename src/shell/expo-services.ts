@@ -121,5 +121,13 @@ function expoNotifier(channelName: string): Notifier {
         trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour: r.hour, minute: r.minute, channelId: CHANNEL_ID },
       });
     },
+    async scheduleOnce(r) {
+      if (!(await ensureReady())) return;
+      await Notifications.scheduleNotificationAsync({
+        identifier: r.id,
+        content: { title: r.title, body: r.body },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: r.at, channelId: CHANNEL_ID },
+      });
+    },
   };
 }
