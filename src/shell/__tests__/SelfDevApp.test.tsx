@@ -262,6 +262,45 @@ describe('SelfDevApp', () => {
     await waitFor(() => expect(s.scheduled.at(-1)).toEqual([{ id: 'evening', hour: 21, minute: 0, title: 'Diary', body: undefined }]));
   });
 
+  describe('actions the layer runs when the app opens', () => {
+    function opening() {
+      const foreground = new Set<() => void>();
+      const s = services(nodeSqlite());
+      s.services.onForeground = (listener) => {
+        foreground.add(listener);
+        return () => foreground.delete(listener);
+      };
+      const runs: number[] = [];
+      const actions = {
+        logWeather: {
+          description: 'x',
+          run: async (ctx: { store: { list(c: string): readonly unknown[] } }) => {
+            runs.push(ctx.store.list('diary').length);
+            return 'logged';
+          },
+        },
+      };
+      return { s, runs, actions, comeBack: () => foreground.forEach((l) => l()) };
+    }
+
+    it('runs them once the app has started, with the data store', async () => {
+      const { s, runs, actions } = opening();
+      await render(<SelfDevApp defaultLayer={{ ...layer, onOpen: ['logWeather'] }} services={s.services} actions={actions} />);
+
+      await waitFor(() => expect(runs).toEqual([0]));
+    });
+
+    it('runs them again each time the app comes back to the foreground', async () => {
+      const { s, runs, actions, comeBack } = opening();
+      await render(<SelfDevApp defaultLayer={{ ...layer, onOpen: ['logWeather'] }} services={s.services} actions={actions} />);
+      await waitFor(() => expect(runs).toHaveLength(1));
+
+      comeBack();
+
+      await waitFor(() => expect(runs).toHaveLength(2));
+    });
+  });
+
   it('drops the coming reminder once the form it asks for is saved', async () => {
     // A 24-hour window always holds a record saved now, whatever the time of day the test runs.
     const skipping: UserLayer = {

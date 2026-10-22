@@ -45,7 +45,12 @@ will receive).
   tabs:        [ { screen, title } ],           // at least one
   reminders?:  [ { id, time: "HH:MM", title, body?,          // daily, ids unique
                    skipIfRecorded?: { collection, withinHours } } ],  // 0 < hours <= 24
-  scripts?:    { <name>: { source, tests: [ { name, input, expect } ] } } }   // ≥ 1 test each
+  scripts?:    { <name>: { source, tests: [ { name, input, expect } ] } },    // ≥ 1 test each
+  onOpen?:     [ "<app action>" ] }   // run quietly at launch and on each return to the foreground
+
+onOpen actions get the data store like any action; their messages are dropped and failures only
+logged, so they suit background chores such as logging the weather. The shell learns about the
+foreground through `PlatformServices.onForeground` (AppState in the Expo services).
 
 A reminder with skipIfRecorded is left out on a day when `collection` already got a record within
 `withinHours` before it (the diary reminder after the diary is filled in). Android cannot drop one

@@ -41,6 +41,8 @@ export type PlatformServices = {
   createProvider(settings: AiSettings, apiKey: string): ModelProvider;
   /** React hook over the OTA update client; omitted when the build has none. Must be a stable function. */
   useUpdates?: () => UpdatesView;
+  /** Calls `listener` each time the app returns to the foreground; returns the unsubscribe function. */
+  onForeground?: (listener: () => void) => () => void;
 };
 
 const NO_UPDATES: UpdatesView = { status: 'unavailable', check: async () => {}, restart: async () => {} };
@@ -170,6 +172,23 @@ export function SelfDevApp({
   }, [booted, history]);
 
   const layer = history ? rendered(history) : null;
+
+  const onOpenKey = JSON.stringify(layer?.onOpen ?? []);
+  useEffect(() => {
+    if (!booted || !layer) return;
+    const names: string[] = JSON.parse(onOpenKey);
+    if (names.length === 0) return;
+    const runAll = () => {
+      for (const name of names) {
+        // Background work: a failure (offline, permission refused) is logged, never shown.
+        actions[name]?.run({ store: booted.store }).catch((e: unknown) => console.warn(`onOpen ${name}`, e));
+      }
+    };
+    runAll();
+    return services.onForeground?.(runAll);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onOpenKey, booted, actions, services, layer !== null]);
+
   const remindersKey = JSON.stringify(layer?.reminders ?? []);
   const reminderSync = useRef(Promise.resolve());
   useEffect(() => {

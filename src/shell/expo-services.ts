@@ -5,7 +5,7 @@ import * as SecureStore from 'expo-secure-store';
 import * as SQLite from 'expo-sqlite';
 import * as Updates from 'expo-updates';
 import { useState } from 'react';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 import { createAnthropicProvider, type MessagesClient } from '../agent/anthropic';
 import type { Notifier } from '../capabilities/reminders';
@@ -36,6 +36,12 @@ export function createExpoServices(opts: { databaseName?: string; channelName?: 
       set: (key, value) => SecureStore.setItemAsync(key, value),
     },
     useUpdates: useExpoUpdates,
+    onForeground(listener) {
+      const sub = AppState.addEventListener('change', (state) => {
+        if (state === 'active') listener();
+      });
+      return () => sub.remove();
+    },
     createProvider(settings, apiKey) {
       // The key is the user's own and stays on their device; the SDK's browser check does not apply
       // to React Native, where a missing `document` is the only thing it could test.

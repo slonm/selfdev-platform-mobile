@@ -126,6 +126,8 @@ export const userLayerSchema = z.strictObject({
   reminders: z.array(reminderSchema).optional(),
   /** Named scripts, used by computed collections. */
   scripts: z.record(z.string(), scriptSchema).optional(),
+  /** App actions run quietly at launch and whenever the app returns to the foreground. */
+  onOpen: z.array(z.string()).optional(),
 });
 
 export type Reminder = z.infer<typeof reminderSchema>;
@@ -178,6 +180,10 @@ function checkReferences(layer: UserLayer, actions: readonly string[]): Validati
     if (skip !== undefined && !Object.hasOwn(layer.collections, skip)) {
       fail(['reminders', i, 'skipIfRecorded', 'collection'], `no collection "${skip}"`);
     }
+  });
+
+  layer.onOpen?.forEach((action, i) => {
+    if (!actions.includes(action)) fail(['onOpen', i], `the app has no action "${action}"`);
   });
 
   for (const [name, c] of Object.entries(layer.collections)) {

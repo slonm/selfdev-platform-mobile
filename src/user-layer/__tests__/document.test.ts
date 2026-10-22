@@ -297,6 +297,22 @@ describe('validateLayer', () => {
     });
   });
 
+  describe('actions run when the app opens', () => {
+    it('accepts actions the app provides', () => {
+      const layer = { ...sampleLayer(), onOpen: ['logWeather'] };
+
+      expect(validateLayer(layer, { actions: ['logWeather'] }).ok).toBe(true);
+    });
+
+    it('rejects an action the app does not provide, pointing at it', () => {
+      const layer = { ...sampleLayer(), onOpen: ['logWeather', 'deleteAll'] };
+
+      const r = validateLayer(layer, { actions: ['logWeather'] });
+
+      expect(r.ok ? [] : r.errors.map((e) => e.path)).toEqual([['onOpen', 1]]);
+    });
+  });
+
   describe('action buttons', () => {
     function withAction(action: string): any {
       const layer = sampleLayer();
