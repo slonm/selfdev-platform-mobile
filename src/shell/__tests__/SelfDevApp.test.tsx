@@ -385,14 +385,30 @@ describe('SelfDevApp', () => {
       expect(snapshotted).toEqual([db]);
     });
 
-    it('runs them again each time the app comes back to the foreground', async () => {
+    it('runs them again when the app comes back to the foreground after a while', async () => {
       const { s, runs, actions, comeBack } = opening();
-      await render(<SelfDevApp defaultLayer={{ ...layer, onOpen: ['logWeather'] }} services={s.services} actions={actions} />);
+      await render(
+        <SelfDevApp defaultLayer={{ ...layer, onOpen: ['logWeather'] }} services={s.services} actions={actions} onOpenIntervalMs={0} />
+      );
       await waitFor(() => expect(runs).toHaveLength(1));
 
       comeBack();
 
       await waitFor(() => expect(runs).toHaveLength(2));
+    });
+
+    it('does not rerun them for a moment away, e.g. a permission dialog, which would loop', async () => {
+      const { s, runs, actions, comeBack } = opening();
+      await render(
+        <SelfDevApp defaultLayer={{ ...layer, onOpen: ['logWeather'] }} services={s.services} actions={actions} onOpenIntervalMs={600_000} />
+      );
+      await waitFor(() => expect(runs).toHaveLength(1));
+
+      comeBack();
+      comeBack();
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(runs).toHaveLength(1);
     });
   });
 

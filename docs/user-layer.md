@@ -50,7 +50,9 @@ will receive).
   onOpen?:     [ "<app action>" ] }   // run quietly at launch and on each return to the foreground
 
 onOpen actions get the data store like any action; their messages are dropped and failures only
-logged, so they suit background chores such as logging the weather. The shell learns about the
+logged, so they suit background chores such as logging the weather. They rerun on return to the
+foreground only after `onOpenIntervalMs` (10 min): a permission dialog also sends the app to the
+background and back, and an action that asks for a permission would otherwise loop. The shell learns about the
 foreground through `PlatformServices.onForeground` (AppState in the Expo services).
 
 Every action gets an `ActionContext`: the store, the layer being shown, and — when the services

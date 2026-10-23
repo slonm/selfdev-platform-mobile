@@ -47,6 +47,8 @@ export type PlatformServices = {
   snapshotDatabase?: (db: SqlDatabase) => Promise<string>;
 };
 
+const ON_OPEN_INTERVAL_MS = 10 * 60_000;
+
 const NO_UPDATES: UpdatesView = { status: 'unavailable', check: async () => {}, restart: async () => {} };
 const useNoUpdates = () => NO_UPDATES;
 
@@ -112,6 +114,7 @@ export function SelfDevApp({
   strings: overrides,
   autoRestartWindowMs = AUTO_RESTART_WINDOW_MS,
   checkNativeUpdate,
+  onOpenIntervalMs = ON_OPEN_INTERVAL_MS,
 }: {
   defaultLayer: UserLayer;
   services: PlatformServices;
@@ -130,6 +133,11 @@ export function SelfDevApp({
    * by "Check for updates".
    */
   checkNativeUpdate?: () => Promise<NativeUpdate | null>;
+  /**
+   * The layer's onOpen actions run at launch and again on return to the foreground once this much
+   * time has passed since they last ran; a brief trip away (a system dialog) does not rerun them.
+   */
+  onOpenIntervalMs?: number;
 }) {
   const strings = { ...defaultStrings, ...overrides };
   const [booted, setBooted] = useState<Booted | null>(null);
@@ -210,16 +218,21 @@ export function SelfDevApp({
     if (!booted || !layer) return;
     const names: string[] = JSON.parse(onOpenKey);
     if (names.length === 0) return;
+    let lastRun = 0;
     const runAll = () => {
+      lastRun = Date.now();
       for (const name of names) {
         // Background work: a failure (offline, permission refused) is logged, never shown.
         actions[name]?.run({ ...actionContext(booted), store: booted.store, layer }).catch((e: unknown) => console.warn(`onOpen ${name}`, e));
       }
     };
     runAll();
-    return services.onForeground?.(runAll);
+    // A permission dialog also sends the app to the background and back; rerunning then loops.
+    return services.onForeground?.(() => {
+      if (Date.now() - lastRun >= onOpenIntervalMs) runAll();
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onOpenKey, booted, actions, services, layer !== null]);
+  }, [onOpenKey, booted, actions, services, layer !== null, onOpenIntervalMs]);
 
   const remindersKey = JSON.stringify(layer?.reminders ?? []);
   const reminderSync = useRef(Promise.resolve());
