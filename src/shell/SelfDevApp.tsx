@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { createLayerTools } from '../agent/layer-tools';
 import { runAgent } from '../agent/loop';
@@ -79,8 +79,13 @@ export const defaultStrings = {
   upToDate: 'The latest version is installed',
   updatesUnavailable: 'Updates are not available in this build',
   version: 'Version:',
+  nativeUpdate: 'A new version of the app is available',
+  downloadApp: 'Download app',
 };
 export type ShellStrings = typeof defaultStrings;
+
+/** A native build newer than the running one; `url` downloads it. */
+export type NativeUpdate = { url: string };
 
 const HISTORY_KEY = 'layer-history';
 /** The app's default layer as of the last launch, to notice when an update ships a new one. */
@@ -106,6 +111,7 @@ export function SelfDevApp({
   actions = NO_ACTIONS,
   strings: overrides,
   autoRestartWindowMs = AUTO_RESTART_WINDOW_MS,
+  checkNativeUpdate,
 }: {
   defaultLayer: UserLayer;
   services: PlatformServices;
@@ -118,6 +124,12 @@ export function SelfDevApp({
    * user asked for with "Check for updates" always restarts at once.
    */
   autoRestartWindowMs?: number;
+  /**
+   * Looks for a newer native build than the running one, which over-the-air updates cannot
+   * deliver; resolves its download link, or null. Called at launch, on return to the foreground and
+   * by "Check for updates".
+   */
+  checkNativeUpdate?: () => Promise<NativeUpdate | null>;
 }) {
   const strings = { ...defaultStrings, ...overrides };
   const [booted, setBooted] = useState<Booted | null>(null);
@@ -131,6 +143,14 @@ export function SelfDevApp({
   const launchedAt = useRef(0);
   const restartRequested = useRef(false);
   const restarting = useRef(false);
+  const [nativeUpdate, setNativeUpdate] = useState<NativeUpdate | null>(null);
+  const checkNative = useCallback(() => {
+    checkNativeUpdate?.().then(setNativeUpdate, (e: unknown) => console.warn('native update check', e));
+  }, [checkNativeUpdate]);
+  useEffect(() => {
+    checkNative();
+    return services.onForeground?.(checkNative);
+  }, [checkNative, services]);
 
   useEffect(() => {
     launchedAt.current = Date.now();
@@ -248,8 +268,10 @@ export function SelfDevApp({
           actions={actions}
           strings={strings}
           updates={services.useUpdates ? updates : null}
+          nativeUpdate={nativeUpdate}
           onUserCheck={() => {
             restartRequested.current = true;
+            checkNative();
           }}
           onBack={() => setView('app')}
         />
@@ -257,6 +279,7 @@ export function SelfDevApp({
         <>
           <View style={styles.bar}>
             <UpdateBanner updates={updates} strings={strings} />
+            <NativeUpdateRow update={nativeUpdate} strings={strings} />
             {history.safeMode && <Text style={styles.notice}>{strings.safeMode}</Text>}
             {history.preview !== null && (
               <View style={styles.previewRow}>
@@ -301,6 +324,7 @@ function UpdateBanner({ updates, strings }: { updates: UpdatesView; strings: She
 function AgentScreen(props: {
   updates: UpdatesView | null;
   onUserCheck: () => void;
+  nativeUpdate: NativeUpdate | null;
   history: History<UserLayer>;
   setHistory: (h: History<UserLayer>) => void;
   booted: Booted;
@@ -387,6 +411,7 @@ function AgentScreen(props: {
           {props.updates.version && <Text style={styles.hint}>{`${strings.version} ${props.updates.version}`}</Text>}
         </View>
       )}
+      <NativeUpdateRow update={props.nativeUpdate} strings={strings} />
       {settings && apiKey === null ? (
         <SettingsForm
           initial={settings}
@@ -427,6 +452,17 @@ function AgentScreen(props: {
           </View>
         </>
       )}
+    </View>
+  );
+}
+
+/** A newer APK than the installed one: say so and offer its download. */
+function NativeUpdateRow({ update, strings }: { update: NativeUpdate | null; strings: ShellStrings }) {
+  if (!update) return null;
+  return (
+    <View style={styles.updateRow}>
+      <Text style={styles.updateText}>{strings.nativeUpdate}</Text>
+      <SmallButton label={strings.downloadApp} onPress={() => void Linking.openURL(update.url)} />
     </View>
   );
 }

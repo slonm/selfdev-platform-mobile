@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, userEvent, waitFor } from '@testing-library/react-native';
+import { Linking } from 'react-native';
 
 import { nodeSqlite } from '../../__fixtures__/node-sqlite';
 import { sampleLayer } from '../../__fixtures__/sample-layer';
@@ -107,6 +108,47 @@ describe('app updates', () => {
 
     expect(calls).toEqual(['check']);
     expect(await screen.findByText('The latest version is installed')).toBeOnTheScreen();
+  });
+
+  describe('a newer native build (APK), which over-the-air updates cannot deliver', () => {
+    const APK = 'https://example.invalid/new.apk';
+
+    it('is announced on the main screen with a download link', async () => {
+      const opened = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+      const user = userEvent.setup();
+      await render(
+        <SelfDevApp defaultLayer={layer} services={services(nodeSqlite()).services} checkNativeUpdate={async () => ({ url: APK })} />
+      );
+
+      await user.press(await screen.findByRole('button', { name: 'Download app' }));
+
+      expect(screen.getByText('A new version of the app is available')).toBeOnTheScreen();
+      expect(opened).toHaveBeenCalledWith(APK);
+      opened.mockRestore();
+    });
+
+    it('is looked for again by "Check for updates" and offered there', async () => {
+      const { s } = withUpdates({ status: 'idle' });
+      let available: { url: string } | null = null;
+      const user = userEvent.setup();
+      await render(<SelfDevApp defaultLayer={layer} services={s.services} checkNativeUpdate={async () => available} />);
+      await user.press(await screen.findByRole('button', { name: 'AI' }));
+      expect(screen.queryByRole('button', { name: 'Download app' })).toBeNull();
+
+      available = { url: APK };
+      await user.press(screen.getByRole('button', { name: 'Check for updates' }));
+
+      expect(await screen.findByRole('button', { name: 'Download app' })).toBeOnTheScreen();
+    });
+
+    it('shows nothing when the installed build is the newest', async () => {
+      await render(
+        <SelfDevApp defaultLayer={layer} services={services(nodeSqlite()).services} checkNativeUpdate={async () => null} />
+      );
+      await screen.findByRole('header', { name: 'Today' });
+
+      expect(screen.queryByText('A new version of the app is available')).toBeNull();
+    });
   });
 
   it('shows why a check failed', async () => {

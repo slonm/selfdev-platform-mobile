@@ -44,6 +44,11 @@ is answered with a platform issue (link back); after the platform release, the a
 dependency. Platform JS changes still reach the phone over the air via the app's next update;
 platform native changes need an app APK rebuild.
 
+An update reaches only APKs with the same native fingerprint, so a new APK must be announced to the
+installed ones another way: `SelfDevApp`'s `checkNativeUpdate()` (the app decides where it looks,
+e.g. a published manifest) is called at launch, on return to the foreground and by "Check for
+updates"; a link it returns is shown on the main screen and the AI screen as "Download app".
+
 ## On-device development
 
 Besides the GitHub loop, a third layer — the **user layer** (declarative screens + sandboxed
