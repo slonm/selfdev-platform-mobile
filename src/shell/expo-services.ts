@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import AnthropicFoundry from '@anthropic-ai/foundry-sdk';
+import { File, Paths } from 'expo-file-system';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import * as SQLite from 'expo-sqlite';
@@ -9,6 +10,7 @@ import { AppState, Platform } from 'react-native';
 
 import { createAnthropicProvider, type MessagesClient } from '../agent/anthropic';
 import type { Notifier } from '../capabilities/reminders';
+import { snapshotInto } from '../data/export';
 import type { PlatformServices, UpdatesView } from './SelfDevApp';
 
 const CHANNEL_ID = 'reminders';
@@ -36,6 +38,13 @@ export function createExpoServices(opts: { databaseName?: string; channelName?: 
       set: (key, value) => SecureStore.setItemAsync(key, value),
     },
     useUpdates: useExpoUpdates,
+    async snapshotDatabase(db) {
+      const file = new File(Paths.cache, 'database-snapshot.db');
+      if (file.exists) file.delete();
+      // VACUUM INTO takes a path; React Native's URL has no pathname, so strip the scheme by hand.
+      await snapshotInto(db, decodeURIComponent(file.uri.replace(/^file:\/\//, '')));
+      return file.uri;
+    },
     onForeground(listener) {
       const sub = AppState.addEventListener('change', (state) => {
         if (state === 'active') listener();

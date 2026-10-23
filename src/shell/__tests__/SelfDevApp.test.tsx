@@ -290,6 +290,29 @@ describe('SelfDevApp', () => {
       await waitFor(() => expect(runs).toEqual([0]));
     });
 
+    it('gives them the layer and a database snapshot from the platform services', async () => {
+      const db = nodeSqlite();
+      const s = services(db);
+      const snapshotted: unknown[] = [];
+      s.services.snapshotDatabase = async (d) => {
+        snapshotted.push(d);
+        return 'file:///cache/snapshot.db';
+      };
+      const seen: unknown[] = [];
+      const actions = {
+        backup: {
+          description: 'x',
+          run: async (ctx: { layer?: UserLayer; snapshotDatabase?: () => Promise<string> }) => {
+            seen.push(ctx.layer?.onOpen, await ctx.snapshotDatabase?.());
+          },
+        },
+      };
+      await render(<SelfDevApp defaultLayer={{ ...layer, onOpen: ['backup'] }} services={s.services} actions={actions} />);
+
+      await waitFor(() => expect(seen).toEqual([['backup'], 'file:///cache/snapshot.db']));
+      expect(snapshotted).toEqual([db]);
+    });
+
     it('runs them again each time the app comes back to the foreground', async () => {
       const { s, runs, actions, comeBack } = opening();
       await render(<SelfDevApp defaultLayer={{ ...layer, onOpen: ['logWeather'] }} services={s.services} actions={actions} />);

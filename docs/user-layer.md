@@ -52,6 +52,12 @@ onOpen actions get the data store like any action; their messages are dropped an
 logged, so they suit background chores such as logging the weather. The shell learns about the
 foreground through `PlatformServices.onForeground` (AppState in the Expo services).
 
+Every action gets an `ActionContext`: the store, the layer being shown, and — when the services
+provide it — `snapshotDatabase()`, a consistent copy of the whole SQLite database in a fresh file
+(VACUUM INTO, `snapshotInto`). With `exportCsv(store, layer)` (one CSV per collection with local
+time, epoch ms and every field, plus `fields.csv` naming them) an app can back up or export its
+data anywhere without the platform knowing the destination.
+
 A reminder with skipIfRecorded is left out on a day when `collection` already got a record within
 `withinHours` before it (the diary reminder after the diary is filled in). Android cannot drop one
 day of a repeating notification, so such a reminder is scheduled as one notification per day for

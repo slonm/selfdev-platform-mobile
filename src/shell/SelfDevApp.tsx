@@ -5,7 +5,7 @@ import { createLayerTools } from '../agent/layer-tools';
 import { runAgent } from '../agent/loop';
 import type { AgentMessage, ModelProvider } from '../agent/provider';
 import { layerAgentSystemPrompt } from '../agent/system-prompt';
-import type { AppActions } from '../capabilities/actions';
+import type { ActionContext, AppActions } from '../capabilities/actions';
 import { syncReminders, type Notifier } from '../capabilities/reminders';
 import type { SqlDatabase } from '../data/sql';
 import { openKeyValue, openSqlStore, type KeyValue, type SqlStore } from '../data/sql-store';
@@ -43,6 +43,8 @@ export type PlatformServices = {
   useUpdates?: () => UpdatesView;
   /** Calls `listener` each time the app returns to the foreground; returns the unsubscribe function. */
   onForeground?: (listener: () => void) => () => void;
+  /** Writes a consistent copy of `db` to a fresh file and returns its URI (see `snapshotInto`). */
+  snapshotDatabase?: (db: SqlDatabase) => Promise<string>;
 };
 
 const NO_UPDATES: UpdatesView = { status: 'unavailable', check: async () => {}, restart: async () => {} };
@@ -89,7 +91,7 @@ const DEFAULT_SETTINGS: AiSettings = { provider: 'anthropic', model: 'claude-son
 const NO_ACTIONS: AppActions = {};
 const AUTO_RESTART_WINDOW_MS = 20_000;
 
-type Booted = { store: SqlStore; kv: KeyValue };
+type Booted = { store: SqlStore; kv: KeyValue; db: SqlDatabase };
 
 /**
  * A complete self-extending app around a user layer: restores the layer history from SQLite,
@@ -158,7 +160,7 @@ export function SelfDevApp({
       );
       await kv.set(DEFAULT_KEY, defaultLayer);
       if (cancelled) return;
-      setBooted({ store, kv });
+      setBooted({ store, kv, db });
       setHistory(restored);
     })().catch((e: unknown) => setFailure(String(e)));
     return () => {
@@ -173,6 +175,12 @@ export function SelfDevApp({
 
   const layer = history ? rendered(history) : null;
 
+  // What actions get besides the store and the layer.
+  const actionContext = (b: Booted): Omit<ActionContext, 'store' | 'layer'> => {
+    const snapshot = services.snapshotDatabase;
+    return snapshot ? { snapshotDatabase: () => snapshot(b.db) } : {};
+  };
+
   const onOpenKey = JSON.stringify(layer?.onOpen ?? []);
   useEffect(() => {
     if (!booted || !layer) return;
@@ -181,7 +189,7 @@ export function SelfDevApp({
     const runAll = () => {
       for (const name of names) {
         // Background work: a failure (offline, permission refused) is logged, never shown.
-        actions[name]?.run({ store: booted.store }).catch((e: unknown) => console.warn(`onOpen ${name}`, e));
+        actions[name]?.run({ ...actionContext(booted), store: booted.store, layer }).catch((e: unknown) => console.warn(`onOpen ${name}`, e));
       }
     };
     runAll();
@@ -260,7 +268,13 @@ export function SelfDevApp({
             <View style={styles.spacer} />
             <SmallButton label={strings.ai} onPress={() => setView('agent')} />
           </View>
-          <LayerView layer={layer} store={booted.store} actions={actions} runningLabel={strings.running} />
+          <LayerView
+            layer={layer}
+            store={booted.store}
+            actions={actions}
+            runningLabel={strings.running}
+            context={actionContext(booted)}
+          />
         </>
       )}
     </View>

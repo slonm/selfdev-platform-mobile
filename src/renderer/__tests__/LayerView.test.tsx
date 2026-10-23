@@ -1,4 +1,4 @@
-import { act, render, screen, userEvent } from '@testing-library/react-native';
+import { act, render, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
 import { sampleLayer } from '../../__fixtures__/sample-layer';
@@ -290,6 +290,27 @@ describe('LayerView', () => {
         screens: { ...sampleLayer.screens, about: { title: 'About', body: [{ type: 'action', label: 'Import', action: 'importNight' }] } },
       };
     }
+
+    it('gives the action the shown layer and the context the shell provides', async () => {
+      const shown = actionLayer();
+      const seen: unknown[] = [];
+      const snapshotDatabase = async () => 'file:///snap.db';
+      const actions = {
+        importNight: {
+          description: 'x',
+          run: async (ctx: { layer?: UserLayer; snapshotDatabase?: () => Promise<string> }) => {
+            seen.push(ctx.layer, await ctx.snapshotDatabase?.());
+          },
+        },
+      };
+      const user = userEvent.setup();
+      await render(<LayerView layer={shown} store={createMemoryStore()} actions={actions} context={{ snapshotDatabase }} />);
+      await user.press(screen.getByRole('tab', { name: 'About' }));
+
+      await user.press(screen.getByRole('button', { name: 'Import' }));
+
+      await waitFor(() => expect(seen).toEqual([shown, 'file:///snap.db']));
+    });
 
     it('runs the app action with the data store and shows its message', async () => {
       const store = createMemoryStore(() => 1);

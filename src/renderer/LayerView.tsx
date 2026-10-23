@@ -1,7 +1,7 @@
 import { useMemo, useState, useSyncExternalStore } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import type { AppActions } from '../capabilities/actions';
+import type { ActionContext, AppActions } from '../capabilities/actions';
 import { withComputed } from '../data/computed-store';
 import type { DataRecord, DataStore, FieldValue } from '../data/store';
 import type { UserLayer } from '../user-layer/document';
@@ -19,6 +19,7 @@ export function LayerView({
   store: baseStore,
   actions = {},
   runningLabel = 'Working…',
+  context = {},
 }: {
   layer: UserLayer;
   store: DataStore;
@@ -26,6 +27,8 @@ export function LayerView({
   actions?: AppActions;
   /** Shown under a button while its action runs. */
   runningLabel?: string;
+  /** What the shell adds to every action's context; the store and the layer come from here. */
+  context?: Omit<ActionContext, 'store' | 'layer'>;
 }) {
   const store = useMemo(
     () => withComputed(baseStore, layer, { onError: (c, m) => console.warn(`computed collection "${c}": ${m}`) }),
@@ -48,7 +51,7 @@ export function LayerView({
     if (!action) return update({ running: false, message: { text: `No action "${name}"`, error: true } });
     update({ running: true });
     try {
-      const text = await action.run({ store });
+      const text = await action.run({ ...context, store, layer });
       update({ running: false, message: text ? { text, error: false } : undefined });
     } catch (e) {
       update({ running: false, message: { text: e instanceof Error ? e.message : String(e), error: true } });

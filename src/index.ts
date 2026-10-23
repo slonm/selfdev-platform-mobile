@@ -7,6 +7,7 @@ export * from './agent/system-prompt';
 export * from './capabilities/actions';
 export * from './capabilities/reminders';
 export * from './data/computed-store';
+export * from './data/export';
 export * from './data/memory-store';
 export * from './data/sql';
 export * from './data/sql-store';
