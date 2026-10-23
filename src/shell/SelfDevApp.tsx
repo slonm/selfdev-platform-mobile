@@ -407,7 +407,8 @@ function AgentScreen(props: {
               void props.updates?.check();
             }}
           />
-          <Text style={styles.hint}>{updateStatusText(props.updates, checkedByUser, strings)}</Text>
+          {/* "Up to date" would contradict the link to a newer APK shown below. */}
+          <Text style={styles.hint}>{updateStatusText(props.updates, checkedByUser && !props.nativeUpdate, strings)}</Text>
           {props.updates.version && <Text style={styles.hint}>{`${strings.version} ${props.updates.version}`}</Text>}
         </View>
       )}

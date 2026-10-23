@@ -141,6 +141,18 @@ describe('app updates', () => {
       expect(await screen.findByRole('button', { name: 'Download app' })).toBeOnTheScreen();
     });
 
+    it('does not call the app up to date next to the link to a newer one', async () => {
+      const { s } = withUpdates({ status: 'idle' });
+      const user = userEvent.setup();
+      await render(<SelfDevApp defaultLayer={layer} services={s.services} checkNativeUpdate={async () => ({ url: APK })} />);
+      await user.press(await screen.findByRole('button', { name: 'AI' }));
+
+      await user.press(screen.getByRole('button', { name: 'Check for updates' }));
+
+      expect(await screen.findByRole('button', { name: 'Download app' })).toBeOnTheScreen();
+      expect(screen.queryByText('The latest version is installed')).toBeNull();
+    });
+
     it('shows nothing when the installed build is the newest', async () => {
       await render(
         <SelfDevApp defaultLayer={layer} services={services(nodeSqlite()).services} checkNativeUpdate={async () => null} />
