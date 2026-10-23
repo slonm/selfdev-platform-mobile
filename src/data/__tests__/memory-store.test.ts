@@ -20,6 +20,21 @@ describe('memory data store', () => {
     expect(store.list('empty')).toEqual([]);
   });
 
+  it('keeps an explicit record time, for data imported after the fact', () => {
+    const store = createMemoryStore(() => 1000);
+
+    expect(store.add('diary', { mood: 3 }, 400).createdAt).toBe(400);
+  });
+
+  it('lists records in time order even when an older one is added later', () => {
+    const store = createMemoryStore(() => 1000);
+    store.add('diary', { mood: 1 });
+    store.add('diary', { mood: 2 }, 500);
+    store.add('diary', { mood: 3 }, 1000);
+
+    expect(store.list('diary').map((r) => r.values.mood)).toEqual([2, 1, 3]);
+  });
+
   it('gives each record a distinct id', () => {
     const store = createMemoryStore(() => 0);
 

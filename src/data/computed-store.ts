@@ -28,9 +28,9 @@ export function withComputed(
   };
 
   return {
-    add(collection, values) {
+    add(collection, values, createdAt) {
       if (computed(collection)) throw new Error(`"${collection}" is computed and read-only`);
-      return base.add(collection, values);
+      return base.add(collection, values, createdAt);
     },
     list(collection) {
       const c = computed(collection);

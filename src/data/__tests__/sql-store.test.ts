@@ -20,6 +20,21 @@ describe('SQLite data store', () => {
     expect(reopened.list('other')).toHaveLength(1);
   });
 
+  it('keeps an imported record at its own time, in time order after reopening', async () => {
+    const db = nodeSqlite();
+    const first = await openSqlStore(db, { now: () => 1000 });
+    first.add('diary', { mood: 1 });
+    first.add('diary', { mood: 2 }, 500);
+    await first.flush();
+
+    const reopened = await openSqlStore(db);
+
+    expect(reopened.list('diary').map((r) => [r.createdAt, r.values.mood])).toEqual([
+      [500, 2],
+      [1000, 1],
+    ]);
+  });
+
   it('keeps record ids stable across reopening', async () => {
     const db = nodeSqlite();
     const first = await openSqlStore(db);

@@ -19,15 +19,20 @@ export function createMemoryStore(now: () => number = Date.now, options: MemoryS
     if (list) list.push(record);
     else grouped.set(collection, [record]);
   }
-  for (const [collection, list] of grouped) collections.set(collection, list);
+  // Array.prototype.sort is stable, so equal times keep their insertion order.
+  for (const [collection, list] of grouped) collections.set(collection, list.sort((a, b) => a.createdAt - b.createdAt));
 
   return {
-    add(collection, values) {
-      const createdAt = now();
+    add(collection, values, at) {
+      const createdAt = at ?? now();
       // Unique across restarts without a crypto API (Hermes has no randomUUID).
       const id = `${createdAt.toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
       const record: DataRecord = { id, createdAt, values: { ...values } };
-      collections.set(collection, [...(collections.get(collection) ?? EMPTY), record]);
+      const list = collections.get(collection) ?? EMPTY;
+      // After every record at the same time or earlier, so the list stays in time order.
+      let i = list.length;
+      while (i > 0 && (list[i - 1]?.createdAt ?? -Infinity) > createdAt) i--;
+      collections.set(collection, [...list.slice(0, i), record, ...list.slice(i)]);
       options.onAdd?.(collection, record);
       listeners.forEach((l) => l());
       return record;

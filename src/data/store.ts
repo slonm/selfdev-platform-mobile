@@ -17,7 +17,9 @@ export type DataRecord = {
  * with `useSyncExternalStore` without re-rendering on every read.
  */
 export interface DataStore {
-  add(collection: string, values: Record<string, FieldValue>): DataRecord;
+  /** Stamps the record with `createdAt` when given (data imported after the fact), else the clock. */
+  add(collection: string, values: Record<string, FieldValue>, createdAt?: number): DataRecord;
+  /** Records of one collection in time order (`createdAt`; equal times in the order added). */
   list(collection: string): readonly DataRecord[];
   /** Calls `listener` after any change; returns the unsubscribe function. */
   subscribe(listener: () => void): () => void;
