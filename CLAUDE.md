@@ -50,5 +50,9 @@ All three gates must be green before a change is done.
 - Generate JSON Schema from zod with `io: 'input'`: the default output mode marks plain `z.object` as
   closed and hides non-strict objects (`src/user-layer/__tests__/strict-schema.test.ts`).
 - `npm test` runs jest with `--disable-warning=ExperimentalWarning` (storage tests use `node:sqlite`).
+- Records store their fields as JSON, so new collections and fields need no migration. A change to the
+  tables themselves is a new step appended to `SCHEMA` in `src/data/sql-store.ts` (`migrate`,
+  `user_version`); never edit or reorder a released step, and keep the test that opens a database
+  of the previous version and finds its data intact.
 - `.claude/` is re-included by `.gitignore` (`!.claude/`) because the author's global gitignore
   excludes it; the TDD skill must ship with the repo so cloud Claude Code sessions follow it too.

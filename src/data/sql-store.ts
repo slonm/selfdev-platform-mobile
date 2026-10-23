@@ -1,6 +1,29 @@
 import { createMemoryStore } from './memory-store';
+import { migrate, type Migration } from './migrate';
 import type { SqlDatabase } from './sql';
 import type { DataRecord, DataStore } from './store';
+
+/**
+ * The platform's tables, as append-only migrations. Records keep their fields as JSON, so new
+ * collections and fields need no step here; a step is only for the tables themselves. Step 1 uses
+ * IF NOT EXISTS because databases created before versioning already have both tables.
+ */
+const SCHEMA: Migration[] = [
+  (db) =>
+    db.execAsync(
+      `CREATE TABLE IF NOT EXISTS records (
+         id TEXT PRIMARY KEY, collection TEXT NOT NULL, created_at INTEGER NOT NULL, values_json TEXT NOT NULL);
+       CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);`
+    ),
+];
+
+// The store and the key-value table open the same database concurrently; migrate it once.
+const schemaReady = new WeakMap<SqlDatabase, Promise<void>>();
+function ensureSchema(db: SqlDatabase): Promise<void> {
+  let ready = schemaReady.get(db);
+  if (!ready) schemaReady.set(db, (ready = migrate(db, SCHEMA)));
+  return ready;
+}
 
 /** A `DataStore` persisted in SQLite. `flush` resolves once every add so far has been written. */
 export type SqlStore = DataStore & { flush(): Promise<void> };
@@ -16,10 +39,7 @@ export async function openSqlStore(
   db: SqlDatabase,
   opts: { now?: () => number; onError?: (e: unknown) => void } = {}
 ): Promise<SqlStore> {
-  await db.execAsync(
-    `CREATE TABLE IF NOT EXISTS records (
-       id TEXT PRIMARY KEY, collection TEXT NOT NULL, created_at INTEGER NOT NULL, values_json TEXT NOT NULL);`
-  );
+  await ensureSchema(db);
   const rows = await db.getAllAsync<Row>('SELECT id, collection, created_at, values_json FROM records ORDER BY rowid', []);
   const onError = opts.onError ?? ((e: unknown) => console.error('record write failed', e));
   let pending: Promise<void> = Promise.resolve();
@@ -52,7 +72,7 @@ export type KeyValue = {
 };
 
 export async function openKeyValue(db: SqlDatabase): Promise<KeyValue> {
-  await db.execAsync('CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);');
+  await ensureSchema(db);
   return {
     async get(key) {
       const [row] = await db.getAllAsync<{ value: string }>('SELECT value FROM kv WHERE key = ?', [key]);
