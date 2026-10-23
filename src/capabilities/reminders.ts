@@ -24,11 +24,15 @@ export interface Notifier {
  */
 export const PLAN_DAYS = 14;
 
+/** How many weeks ahead a weekly reminder is laid out, for the same reason. */
+export const PLAN_WEEKS = 8;
+
 const HOUR = 3_600_000;
 
 /**
  * Makes the OS schedule equal to the layer's reminders: clears what was scheduled, then schedules
- * each reminder daily. A reminder with `skipIfRecorded` is scheduled day by day instead, leaving out
+ * each reminder daily. A weekly reminder (`weekday`) or one with `skipIfRecorded` is scheduled
+ * occurrence by occurrence instead (PLAN_DAYS days or PLAN_WEEKS weeks ahead), leaving out
  * occurrences whose window already holds a record of `store`; call again when such records change.
  * Call after a layer version becomes rendered (accept, undo, safe mode).
  * Expects a validated layer, so times are well-formed.
@@ -44,27 +48,34 @@ export async function syncReminders(
     // Validated as HH:MM.
     const hour = Number(r.time.slice(0, 2));
     const minute = Number(r.time.slice(3, 5));
-    if (!r.skipIfRecorded) {
+    if (!r.skipIfRecorded && r.weekday === undefined) {
       await notifier.scheduleDaily({ id: r.id, hour, minute, title: r.title, body: r.body });
       continue;
     }
-    const { collection, withinHours } = r.skipIfRecorded;
-    const times = (opts.store?.list(collection) ?? []).map((rec) => rec.createdAt);
-    for (const at of nextOccurrences(now, hour, minute, PLAN_DAYS)) {
-      if (times.some((t) => t <= at && t >= at - withinHours * HOUR)) continue;
+    const skip = r.skipIfRecorded;
+    const times = skip ? (opts.store?.list(skip.collection) ?? []).map((rec) => rec.createdAt) : [];
+    const plan =
+      r.weekday === undefined
+        ? nextOccurrences(now, hour, minute, PLAN_DAYS, 1)
+        : nextOccurrences(now, hour, minute, PLAN_WEEKS, 7, r.weekday % 7);
+    for (const at of plan) {
+      if (skip && times.some((t) => t <= at && t >= at - skip.withinHours * HOUR)) continue;
       await notifier.scheduleOnce({ id: `${r.id}@${at}`, at, title: r.title, body: r.body });
     }
   }
 }
 
-/** The next `count` local times of day `hour:minute` strictly after `now`. */
-function nextOccurrences(now: number, hour: number, minute: number, count: number): number[] {
+/**
+ * The next `count` local times `hour:minute` strictly after `now`, `stepDays` apart; with `jsWeekday`
+ * (0 Sunday … 6 Saturday, as Date.getDay) only on that weekday.
+ */
+function nextOccurrences(now: number, hour: number, minute: number, count: number, stepDays: number, jsWeekday?: number): number[] {
   const first = new Date(now);
   first.setHours(hour, minute, 0, 0);
-  if (first.getTime() <= now) first.setDate(first.getDate() + 1);
-  return Array.from({ length: count }, (_, d) => {
+  while (first.getTime() <= now || (jsWeekday !== undefined && first.getDay() !== jsWeekday)) first.setDate(first.getDate() + 1);
+  return Array.from({ length: count }, (_, i) => {
     const day = new Date(first);
-    day.setDate(first.getDate() + d);
+    day.setDate(first.getDate() + i * stepDays);
     return day.getTime();
   });
 }

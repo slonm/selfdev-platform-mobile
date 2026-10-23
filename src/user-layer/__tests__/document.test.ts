@@ -183,7 +183,20 @@ describe('validateLayer', () => {
     expect(errorPaths(layer)).toEqual([['reminders', 0, 'skipIfRecorded', 'collection']]);
   });
 
-  it.each([0, 25])('rejects a reminder skip window of %s hours', (withinHours) => {
+  it('accepts a weekly reminder on a weekday (1 Monday … 7 Sunday) skipped for up to a week', () => {
+    const skipIfRecorded = { collection: 'diary', withinHours: 168 };
+    const layer = { ...sampleLayer(), reminders: [{ id: 'week', time: '20:00', weekday: 7, title: 'Week', skipIfRecorded }] };
+
+    expect(errorPaths(layer)).toEqual([]);
+  });
+
+  it.each([0, 8, 1.5])('rejects weekday %s', (weekday) => {
+    const layer = { ...sampleLayer(), reminders: [{ id: 'week', time: '20:00', weekday, title: 'Week' }] };
+
+    expect(errorPaths(layer)).toEqual([['reminders', 0, 'weekday']]);
+  });
+
+  it.each([0, 169])('rejects a reminder skip window of %s hours', (withinHours) => {
     const skipIfRecorded = { collection: 'diary', withinHours };
     const layer = { ...sampleLayer(), reminders: [{ id: 'evening', time: '21:00', title: 'Diary', skipIfRecorded }] };
 

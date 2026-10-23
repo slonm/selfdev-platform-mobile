@@ -106,6 +106,8 @@ const reminderSchema = z.strictObject({
   id: z.string(),
   /** Local time of day, 24-hour `HH:MM`. */
   time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'time must be HH:MM, 00:00-23:59'),
+  /** Makes the reminder weekly, on this ISO weekday: 1 Monday … 7 Sunday. */
+  weekday: z.int().min(1).max(7).optional(),
   title: z.string(),
   body: z.string().optional(),
   /**
@@ -113,7 +115,7 @@ const reminderSchema = z.strictObject({
    * e.g. the diary reminder once the diary is already filled in.
    */
   skipIfRecorded: z
-    .strictObject({ collection: z.string(), withinHours: z.number().positive().max(24) })
+    .strictObject({ collection: z.string(), withinHours: z.number().positive().max(168) })
     .optional(),
 });
 

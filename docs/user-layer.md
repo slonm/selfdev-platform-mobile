@@ -44,7 +44,8 @@ will receive).
   screens:     { <id>: { title, body: [ node… ] } },
   tabs:        [ { screen, title } ],           // at least one
   reminders?:  [ { id, time: "HH:MM", title, body?,          // daily, ids unique
-                   skipIfRecorded?: { collection, withinHours } } ],  // 0 < hours <= 24
+                   weekday?: 1..7,                          // weekly: 1 Monday … 7 Sunday
+                   skipIfRecorded?: { collection, withinHours } } ],  // 0 < hours <= 168
   scripts?:    { <name>: { source, tests: [ { name, input, expect } ] } },    // ≥ 1 test each
   onOpen?:     [ "<app action>" ] }   // run quietly at launch and on each return to the foreground
 

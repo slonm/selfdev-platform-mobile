@@ -1,6 +1,6 @@
 import { createMemoryStore } from '../../data/memory-store';
 import type { Reminder } from '../../user-layer/document';
-import { PLAN_DAYS, syncReminders, type DailyReminder, type Notifier, type OnceReminder } from '../reminders';
+import { PLAN_DAYS, PLAN_WEEKS, syncReminders, type DailyReminder, type Notifier, type OnceReminder } from '../reminders';
 
 /** Records what the platform asked the OS notification layer to do, in order. */
 function recordingNotifier() {
@@ -97,6 +97,45 @@ describe('syncReminders', () => {
       await syncReminders([evening], notifier, { store, now: at(0, 20, 30) });
 
       expect(onceTimes()[0]).toBe(at(0, 21));
+    });
+  });
+
+  describe('a weekly reminder', () => {
+    // 20 October 2026 is a Tuesday, so the coming Sunday is the 25th.
+    const week: Reminder = {
+      id: 'week',
+      time: '20:00',
+      weekday: 7,
+      title: 'Week',
+      skipIfRecorded: { collection: 'weekly', withinHours: 168 },
+    };
+
+    it('is scheduled once a week on its weekday for the coming weeks', async () => {
+      const { notifier, onceTimes } = recordingNotifier();
+
+      await syncReminders([week], notifier, { store: createMemoryStore(), now: at(0, 12) });
+
+      expect(onceTimes()).toEqual(Array.from({ length: PLAN_WEEKS }, (_, w) => at(5 + 7 * w, 20)));
+    });
+
+    it('skips the week whose questionnaire is already filled in', async () => {
+      const store = createMemoryStore(() => at(3, 10));
+      store.add('weekly', { powerful: 0 });
+      const { notifier, onceTimes } = recordingNotifier();
+
+      await syncReminders([week], notifier, { store, now: at(3, 11) });
+
+      expect(onceTimes()[0]).toBe(at(12, 20));
+    });
+
+    it('is weekly even without a skip rule', async () => {
+      const { notifier, onceTimes, calls } = recordingNotifier();
+      const { skipIfRecorded: _, ...plain } = week;
+
+      await syncReminders([plain], notifier, { now: at(0, 12) });
+
+      expect(onceTimes()[1]! - onceTimes()[0]!).toBe(7 * 24 * HOUR);
+      expect(calls.some((c) => c[0] === 'scheduleDaily')).toBe(false);
     });
   });
 });
