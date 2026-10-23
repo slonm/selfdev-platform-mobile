@@ -11,7 +11,7 @@ import type { SqlDatabase } from '../data/sql';
 import { openKeyValue, openSqlStore, type KeyValue, type SqlStore } from '../data/sql-store';
 import { LayerView } from '../renderer/LayerView';
 import { adoptDefaultLayer } from '../user-layer/adopt-default';
-import { validateLayer, type Reminder, type UserLayer } from '../user-layer/document';
+import type { Reminder, UserLayer } from '../user-layer/document';
 import { accept, discard, launchStarted, launchSucceeded, rendered, undo, type History } from '../user-layer/history';
 import { restoreHistory } from '../user-layer/restore';
 
@@ -170,12 +170,16 @@ export function SelfDevApp({
       const db = await services.openDatabase();
       const [store, kv] = await Promise.all([openSqlStore(db), openKeyValue(db)]);
       const opts = { actions: Object.keys(actions) };
+      // Both are compared, never rendered, so they are not validated against this build's actions:
+      // an update that drops an action must still recognise the layer it shipped before.
       const previousDefault = await kv.get(DEFAULT_KEY);
+      const stored = await kv.get(HISTORY_KEY);
       const restored = launchStarted(
         adoptDefaultLayer(
-          restoreHistory(await kv.get(HISTORY_KEY), defaultLayer, opts),
+          restoreHistory(stored, defaultLayer, opts),
           defaultLayer,
-          validateLayer(previousDefault, opts).ok ? (previousDefault as UserLayer) : null
+          typeof previousDefault === 'object' ? (previousDefault as UserLayer | null) : null,
+          storedActive(stored)
         )
       );
       await kv.set(DEFAULT_KEY, defaultLayer);
@@ -455,6 +459,14 @@ function AgentScreen(props: {
       )}
     </View>
   );
+}
+
+/** The version a persisted history was showing, before restore stepped back over invalid ones. */
+function storedActive(raw: unknown): unknown {
+  const h = raw as { versions?: unknown; accepted?: unknown } | null;
+  if (!Array.isArray(h?.versions) || !Array.isArray(h.accepted)) return undefined;
+  const id = h.accepted.at(-1);
+  return typeof id === 'number' ? h.versions[id] : undefined;
 }
 
 /** A newer APK than the installed one: say so and offer its download. */

@@ -11,11 +11,16 @@ import { accept, propose, type History } from './history';
  *   default is unknown and there is only one version): accept the new default as a new version,
  *   so undo still leads back;
  * - the user did change it: offer the new default as a preview and let them decide.
+ *
+ * `storedActive` is the version the persisted history was showing before `restoreHistory` stepped
+ * back over versions this build cannot render (e.g. one naming an action the update removed); the
+ * user who never changed the layer was looking at the previous default, not at what restore chose.
  */
 export function adoptDefaultLayer(
   h: History<UserLayer>,
   newDefault: UserLayer,
-  previousDefault: UserLayer | null
+  previousDefault: UserLayer | null,
+  storedActive?: unknown
 ): History<UserLayer> {
   const target = canonical(newDefault);
   if (previousDefault !== null && canonical(previousDefault) === target) return h;
@@ -25,7 +30,9 @@ export function adoptDefaultLayer(
   if (previousDefault === null && h.versions.some((v) => canonical(v) === target)) return h;
 
   const untouched =
-    previousDefault !== null ? active !== undefined && canonical(active) === canonical(previousDefault) : h.versions.length === 1;
+    previousDefault !== null
+      ? [active, storedActive].some((v) => v !== undefined && canonical(v) === canonical(previousDefault))
+      : h.versions.length === 1;
   const offered = propose(h, newDefault);
   return untouched ? accept(offered) : offered;
 }

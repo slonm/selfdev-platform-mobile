@@ -287,6 +287,24 @@ describe('SelfDevApp', () => {
     await waitFor(async () => expect(await (await openKeyValue(db)).get('default-layer')).toEqual(proposed));
   });
 
+  it('switches silently to a new default even when the update removed an action the old one used', async () => {
+    // The installed layer and the recorded default both have a button for an action the new build dropped.
+    const old: UserLayer = {
+      ...layer,
+      screens: { ...layer.screens, about: { title: 'About', body: [{ type: 'action', label: 'Drive', action: 'connectDrive' }] } },
+    };
+    // An earlier default came first, then an update brought `old` in; restore steps back over it.
+    const db = nodeSqlite();
+    const kv = await openKeyValue(db);
+    await kv.set('layer-history', accept(propose(createHistory(layer), old)));
+    await kv.set('default-layer', old);
+
+    await render(<SelfDevApp defaultLayer={proposed} services={services(db).services} />);
+
+    expect(await screen.findByRole('tab', { name: 'Trends' })).toBeOnTheScreen();
+    expect(screen.queryByText('Preview')).toBeNull();
+  });
+
   it('counts a launch as complete once the screen has been laid out', async () => {
     const db = nodeSqlite();
     await render(<SelfDevApp defaultLayer={layer} services={services(db).services} />);
