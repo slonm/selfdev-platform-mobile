@@ -108,6 +108,51 @@ describe('LayerView', () => {
     expect(screen.getByTestId('list')).toBeOnTheScreen();
   });
 
+  describe('a node with showIf', () => {
+    function prompting(withinHours?: number): UserLayer {
+      return {
+        ...sampleLayer,
+        collections: { ...sampleLayer.collections, answers: { fields: { note: { type: 'text' } } } },
+        screens: {
+          ...sampleLayer.screens,
+          about: {
+            title: 'About',
+            body: [{ type: 'text', value: 'What happened?', showIf: { newer: 'diary', than: 'answers', withinHours } }],
+          },
+        },
+      };
+    }
+
+    async function show(layer: UserLayer, store: ReturnType<typeof createMemoryStore>) {
+      const user = userEvent.setup();
+      await render(<LayerView layer={layer} store={store} />);
+      await user.press(screen.getByRole('tab', { name: 'About' }));
+    }
+
+    it('appears while the newest record of one collection is newer than any of the other, and hides once answered', async () => {
+      let now = 1000;
+      const store = createMemoryStore(() => now);
+      await show(prompting(), store);
+      expect(screen.queryByText('What happened?')).toBeNull();
+
+      await act(async () => void store.add('diary', { mood: 1 }));
+      expect(screen.getByText('What happened?')).toBeOnTheScreen();
+
+      now = 2000;
+      await act(async () => void store.add('answers', { note: 'late dinner' }));
+      expect(screen.queryByText('What happened?')).toBeNull();
+    });
+
+    it('stays hidden once the prompting record is older than withinHours', async () => {
+      const store = createMemoryStore(() => Date.now() - 20 * 3_600_000);
+      store.add('diary', { mood: 1 });
+
+      await show(prompting(18), store);
+
+      expect(screen.queryByText('What happened?')).toBeNull();
+    });
+  });
+
   it('plots one point per record for each chart series', async () => {
     const { store, user } = await setup();
     store.add('diary', { mood: 1 });

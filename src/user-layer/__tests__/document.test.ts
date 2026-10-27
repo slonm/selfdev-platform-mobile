@@ -156,6 +156,20 @@ describe('validateLayer', () => {
     expect(errorPaths(layer)).toEqual([['screens', 'history', 'body', 1, 'limit']]);
   });
 
+  it('accepts a node shown only while a record of one collection is newer than any of another', () => {
+    const layer = sampleLayer();
+    layer.screens.history.body[1].showIf = { newer: 'diary', than: 'diary', withinHours: 18 };
+
+    expect(errorPaths(layer)).toEqual([]);
+  });
+
+  it('rejects a showIf naming a missing collection', () => {
+    const layer = sampleLayer();
+    layer.screens.history.body[1].showIf = { newer: 'missing', than: 'diary' };
+
+    expect(errorPaths(layer)).toEqual([['screens', 'history', 'body', 1, 'showIf', 'newer']]);
+  });
+
   it('rejects a list column its collection does not define', () => {
     const layer = sampleLayer();
     layer.screens.history.body[1].fields = ['mood', 'missing'];

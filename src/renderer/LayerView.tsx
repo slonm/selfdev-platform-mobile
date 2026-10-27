@@ -1,4 +1,4 @@
-import { useMemo, useState, useSyncExternalStore } from 'react';
+import { useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { ActionContext, AppActions } from '../capabilities/actions';
@@ -76,7 +76,7 @@ export function LayerView({
         {current.body.map((node, i) => {
           // A new layer remounts nodes, so form input made against the old one is dropped.
           const key = `${generation}-${screenId}-${i}`;
-          return (
+          const view = (
             <NodeView
               key={key}
               node={node}
@@ -85,6 +85,13 @@ export function LayerView({
               run={{ state: runs[key], start: (name) => void runAction(key, name), label: runningLabel }}
               collections={layer.collections}
             />
+          );
+          return node.showIf ? (
+            <ShownIf key={key} when={node.showIf} store={store}>
+              {view}
+            </ShownIf>
+          ) : (
+            view
           );
         })}
       </ScrollView>
@@ -185,6 +192,18 @@ function ActionButton({ node, run }: { node: NodeOf<'action'>; run: Run }) {
       <RunStatus run={run} />
     </View>
   );
+}
+
+/** Renders `children` only while the condition of a node's `showIf` holds; follows the store live. */
+function ShownIf({ when, store, children }: { when: NonNullable<Node['showIf']>; store: DataStore; children: ReactNode }) {
+  const newest = useCollection(store, when.newer).at(-1);
+  const answered = useCollection(store, when.than).at(-1);
+  // Read once per mount: hours-long windows do not need a ticking clock, and screens remount on tab switches.
+  const [mountedAt] = useState(() => Date.now());
+  if (!newest) return null;
+  if (when.withinHours !== undefined && mountedAt - newest.createdAt > when.withinHours * 3_600_000) return null;
+  if (answered && answered.createdAt >= newest.createdAt) return null;
+  return <>{children}</>;
 }
 
 function useCollection(store: DataStore, collection: string): readonly DataRecord[] {

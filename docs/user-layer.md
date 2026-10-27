@@ -81,6 +81,12 @@ tests run before a proposal may preview; a broken result at runtime empties only
 | `chart` | number `series` of `collection` against record time |
 | `button` | `navigate` to a screen |
 
+Any node may carry `showIf: { newer, than, withinHours? }`: it is shown only while the newest
+record of collection `newer` is newer than every record of `than` (or `than` is empty), and with
+`withinHours` only while that record is at most so old. Typical use: a follow-up question that
+appears when an app action records something (e.g. a deviation) and disappears once its form is
+saved into `than`.
+
 While an action runs (an `action` node, or a `form` with `action`), a spinner and the shell's
 `running` string stand under its button; then its message or error replaces them. The outcome is
 kept per node for as long as the layer is shown, so switching tabs mid-run does not lose it.

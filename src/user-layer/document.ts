@@ -68,8 +68,22 @@ const textInputSchema = z.strictObject({
 
 const inputSchema = z.discriminatedUnion('type', [scaleSchema, textInputSchema]);
 
+/**
+ * Shows a node only while the newest record of `newer` is newer than every record of `than` (or `than`
+ * is empty), and, with `withinHours`, no older than that: a prompt that appears when something
+ * happened and goes away once it is answered.
+ */
+const showIfSchema = z.strictObject({
+  newer: z.string(),
+  than: z.string(),
+  withinHours: z.number().positive().optional(),
+});
+
+/** Properties every node may have. */
+const common = { showIf: showIfSchema.optional() };
+
 const nodeSchema = z.discriminatedUnion('type', [
-  z.strictObject({ type: z.literal('text'), value: z.string() }),
+  z.strictObject({ type: z.literal('text'), value: z.string(), ...common }),
   z.strictObject({
     type: z.literal('form'),
     /** Each submit adds one record to this collection. */
@@ -80,6 +94,7 @@ const nodeSchema = z.discriminatedUnion('type', [
     action: z.string().optional(),
     /** The button is available only once every scale has an answer; text inputs stay optional. */
     requireAll: z.boolean().optional(),
+    ...common,
   }),
   z.strictObject({
     type: z.literal('list'),
@@ -87,16 +102,18 @@ const nodeSchema = z.discriminatedUnion('type', [
     fields: z.array(z.string()).min(1),
     /** Shows only this many newest records, e.g. 1 for a status line. */
     limit: z.int().positive().optional(),
+    ...common,
   }),
   z.strictObject({
     type: z.literal('chart'),
     collection: z.string(),
     /** Number fields plotted against record time. */
     series: z.array(z.string()).min(1),
+    ...common,
   }),
-  z.strictObject({ type: z.literal('button'), label: z.string(), navigate: z.string() }),
+  z.strictObject({ type: z.literal('button'), label: z.string(), navigate: z.string(), ...common }),
   /** Runs an action the app provides (see `AppAction`), e.g. importing a file. */
-  z.strictObject({ type: z.literal('action'), label: z.string(), action: z.string() }),
+  z.strictObject({ type: z.literal('action'), label: z.string(), action: z.string(), ...common }),
 ]);
 
 const screenSchema = z.strictObject({ title: z.string(), body: z.array(nodeSchema) });
@@ -197,6 +214,10 @@ function checkReferences(layer: UserLayer, actions: readonly string[]): Validati
   for (const [screenId, screen] of Object.entries(layer.screens)) {
     screen.body.forEach((node, n) => {
       const at = ['screens', screenId, 'body', n];
+      for (const key of ['newer', 'than'] as const) {
+        const c = node.showIf?.[key];
+        if (c !== undefined && !Object.hasOwn(layer.collections, c)) fail([...at, 'showIf', key], `no collection "${c}"`);
+      }
       if (node.type === 'action') {
         if (!actions.includes(node.action)) fail([...at, 'action'], `the app has no action "${node.action}"`);
         return;
