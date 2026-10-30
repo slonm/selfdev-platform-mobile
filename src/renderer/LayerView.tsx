@@ -1,4 +1,4 @@
-import { useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { ActionContext, AppActions } from '../capabilities/actions';
@@ -139,6 +139,8 @@ function NodeView({
       return <ChartView node={node} store={store} fields={fields} />;
     case 'action':
       return <ActionButton node={node} run={run} />;
+    case 'stopwatch':
+      return <StopwatchView node={node} store={store} />;
     case 'button':
       return (
         <Pressable accessibilityRole="button" onPress={() => navigate(node.navigate)} style={styles.button}>
@@ -204,6 +206,41 @@ function ShownIf({ when, store, children }: { when: NonNullable<Node['showIf']>;
   if (when.withinHours !== undefined && mountedAt - newest.createdAt > when.withinHours * 3_600_000) return null;
   if (answered && answered.createdAt >= newest.createdAt) return null;
   return <>{children}</>;
+}
+
+/** Start/stop timer: shows m:ss while running and saves the whole seconds as a record on stop. */
+function StopwatchView({ node, store }: { node: NodeOf<'stopwatch'>; store: DataStore }) {
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    if (startedAt === null) return;
+    const tick = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(tick);
+  }, [startedAt]);
+  const running = startedAt !== null;
+  const seconds = running ? Math.max(0, Math.floor((now - startedAt) / 1000)) : 0;
+  const press = () => {
+    const t = Date.now();
+    if (startedAt === null) {
+      setStartedAt(t);
+      setNow(t);
+      return;
+    }
+    store.add(node.collection, { [node.field]: Math.floor((t - startedAt) / 1000) });
+    setStartedAt(null);
+  };
+  return (
+    <View style={styles.field}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${node.label}: ${running ? 'stop' : 'start'}`}
+        onPress={press}
+        style={[styles.button, running && styles.buttonRunning]}>
+        <Text style={styles.buttonText}>{`${running ? '■' : '▶'} ${node.label}`}</Text>
+      </Pressable>
+      {running && <Text style={styles.stopwatch}>{`${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`}</Text>}
+    </View>
+  );
 }
 
 function useCollection(store: DataStore, collection: string): readonly DataRecord[] {
@@ -388,6 +425,8 @@ const styles = StyleSheet.create({
   label: { fontSize: 14, fontWeight: '600', color: '#333' },
   hint: { fontSize: 12, color: '#777' },
   running: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  buttonRunning: { backgroundColor: '#b3261e' },
+  stopwatch: { fontSize: 40, fontWeight: '600', textAlign: 'center', color: '#111', fontVariant: ['tabular-nums'] },
   error: { fontSize: 13, color: '#b3261e' },
   field: { gap: 6 },
   scale: { flexDirection: 'row', gap: 8 },

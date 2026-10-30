@@ -1,4 +1,4 @@
-import { act, render, screen, userEvent, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 
 import { sampleLayer } from '../../__fixtures__/sample-layer';
@@ -112,6 +112,36 @@ describe('LayerView', () => {
     const rows = screen.getAllByTestId('list-row').map((r) => r.props.accessibilityLabel);
     expect(rows).toEqual([expect.stringContaining('second')]);
     expect(screen.getByTestId('list')).toBeOnTheScreen();
+  });
+
+  describe('a stopwatch', () => {
+    function timed(): UserLayer {
+      return {
+        ...sampleLayer,
+        collections: { ...sampleLayer.collections, holds: { fields: { seconds: { type: 'number', label: 'Hold', unit: 's' } } } },
+        screens: {
+          ...sampleLayer.screens,
+          about: { title: 'About', body: [{ type: 'stopwatch', collection: 'holds', field: 'seconds', label: 'Breath hold' }] },
+        },
+      };
+    }
+
+    afterEach(() => jest.useRealTimers());
+
+    it('saves the elapsed whole seconds as one record each time it is stopped', async () => {
+      jest.useFakeTimers({ now: new Date(2026, 9, 30, 8, 0) });
+      const store = createMemoryStore();
+      await render(<LayerView layer={timed()} store={store} />);
+      await fireEvent.press(screen.getByRole('tab', { name: 'About' }));
+
+      await fireEvent.press(screen.getByRole('button', { name: 'Breath hold: start' }));
+      await act(async () => void jest.advanceTimersByTime(95_400));
+      expect(screen.getByText('1:35')).toBeOnTheScreen();
+      await fireEvent.press(screen.getByRole('button', { name: 'Breath hold: stop' }));
+
+      expect(store.list('holds').map((r) => r.values)).toEqual([{ seconds: 95 }]);
+      expect(screen.getByRole('button', { name: 'Breath hold: start' })).toBeOnTheScreen();
+    });
   });
 
   describe('a node with showIf', () => {

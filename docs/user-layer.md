@@ -80,6 +80,7 @@ tests run before a proposal may preview; a broken result at runtime empties only
 | `list` | records of `collection`, newest first, showing `fields`; optional `limit` keeps only that many newest (1 makes a status line); an empty list draws nothing |
 | `chart` | number `series` of `collection` against record time |
 | `button` | `navigate` to a screen |
+| `stopwatch` | start/stop timer showing m:ss; each stop adds a record to `collection` with the elapsed whole seconds in number `field` (e.g. breath holds per round) |
 
 Any node may carry `showIf: { newer, than, withinHours? }`: it is shown only while the newest
 record of collection `newer` is newer than every record of `than` (or `than` is empty), and with

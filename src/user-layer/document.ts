@@ -114,6 +114,8 @@ const nodeSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('button'), label: z.string(), navigate: z.string(), ...common }),
   /** Runs an action the app provides (see `AppAction`), e.g. importing a file. */
   z.strictObject({ type: z.literal('action'), label: z.string(), action: z.string(), ...common }),
+  /** Start/stop timer; each stop adds a record with the elapsed whole seconds in number `field`. */
+  z.strictObject({ type: z.literal('stopwatch'), collection: z.string(), field: z.string(), label: z.string(), ...common }),
 ]);
 
 const screenSchema = z.strictObject({ title: z.string(), body: z.array(nodeSchema) });
@@ -234,7 +236,7 @@ function checkReferences(layer: UserLayer, actions: readonly string[]): Validati
       if (node.type === 'form' && node.action !== undefined && !actions.includes(node.action)) {
         fail([...at, 'action'], `the app has no action "${node.action}"`);
       }
-      if (node.type === 'form' && layer.collections[node.collection]?.compute !== undefined) {
+      if ((node.type === 'form' || node.type === 'stopwatch') && layer.collections[node.collection]?.compute !== undefined) {
         fail([...at, 'collection'], `"${node.collection}" is computed and cannot be written`);
         return;
       }
@@ -251,6 +253,10 @@ function checkReferences(layer: UserLayer, actions: readonly string[]): Validati
             fail([...at, 'fields', f, 'field'], `"${input.field}" already has an input in this form`);
           }
         });
+      } else if (node.type === 'stopwatch') {
+        if (fieldType(node.collection, node.field) !== 'number') {
+          fail([...at, 'field'], `"${node.field}" is not a number field of "${node.collection}"`);
+        }
       } else if (node.type === 'chart') {
         node.series.forEach((field, s) => {
           if (fieldType(node.collection, field) !== 'number') {

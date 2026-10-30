@@ -170,6 +170,20 @@ describe('validateLayer', () => {
     expect(errorPaths(layer)).toEqual([['screens', 'history', 'body', 1, 'showIf', 'newer']]);
   });
 
+  it('accepts a stopwatch saving into a number field', () => {
+    const layer = sampleLayer();
+    layer.screens.history.body.push({ type: 'stopwatch', collection: 'diary', field: 'mood', label: 'Hold' });
+
+    expect(errorPaths(layer)).toEqual([]);
+  });
+
+  it('rejects a stopwatch saving into a text field', () => {
+    const layer = sampleLayer();
+    layer.screens.history.body.push({ type: 'stopwatch', collection: 'diary', field: 'note', label: 'Hold' });
+
+    expect(errorPaths(layer)).toEqual([['screens', 'history', 'body', 2, 'field']]);
+  });
+
   it('rejects a list column its collection does not define', () => {
     const layer = sampleLayer();
     layer.screens.history.body[1].fields = ['mood', 'missing'];
