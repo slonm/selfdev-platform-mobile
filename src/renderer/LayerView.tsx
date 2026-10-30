@@ -72,7 +72,7 @@ export function LayerView({
           {current.title}
         </Text>
       </View>
-      <ScrollView contentContainerStyle={styles.body}>
+      <ScrollView testID="layer-scroll" contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         {current.body.map((node, i) => {
           // A new layer remounts nodes, so form input made against the old one is dropped.
           const key = `${generation}-${screenId}-${i}`;

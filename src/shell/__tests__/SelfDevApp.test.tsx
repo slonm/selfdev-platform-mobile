@@ -242,6 +242,14 @@ describe('app updates', () => {
 });
 
 describe('SelfDevApp', () => {
+  it('moves its content out from under the on-screen keyboard (Android 15+ no longer resizes edge-to-edge apps)', async () => {
+    await render(<SelfDevApp defaultLayer={layer} services={services(nodeSqlite()).services} />);
+    await screen.findByRole('header', { name: 'Today' });
+
+    // jest has no keyboard or layout, so the padding itself is verified on the device.
+    expect(screen.getByTestId('keyboard-avoiding')).toContainElement(screen.getByTestId('selfdev-root'));
+  });
+
   it('boots into the default layer', async () => {
     await render(<SelfDevApp defaultLayer={layer} services={services(nodeSqlite()).services} />);
 

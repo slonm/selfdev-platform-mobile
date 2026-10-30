@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { createLayerTools } from '../agent/layer-tools';
 import { runAgent } from '../agent/loop';
@@ -274,6 +274,8 @@ export function SelfDevApp({
   };
 
   return (
+    // Android 15+ draws apps edge to edge and no longer resizes them for the keyboard.
+    <KeyboardAvoidingView behavior="padding" style={styles.root} testID="keyboard-avoiding">
     <View style={styles.root} testID="selfdev-root" onLayout={markLaunched}>
       {view === 'agent' ? (
         <AgentScreen
@@ -318,6 +320,7 @@ export function SelfDevApp({
         </>
       )}
     </View>
+    </KeyboardAvoidingView>
   );
 }
 

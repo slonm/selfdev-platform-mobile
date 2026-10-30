@@ -14,6 +14,12 @@ async function setup() {
 }
 
 describe('LayerView', () => {
+  it('lets buttons be pressed while the keyboard is open', async () => {
+    await setup();
+
+    expect(screen.getByTestId('layer-scroll').props.keyboardShouldPersistTaps).toBe('handled');
+  });
+
   it('opens on the first tab', async () => {
     await setup();
 
