@@ -57,6 +57,16 @@ describe('computed store', () => {
     expect(() => store.add('moodAvg', { mean: 1 })).toThrow(/computed/);
   });
 
+  it('refuses to edit or remove computed records, but passes edits of stored ones through', () => {
+    const { store } = setup();
+    const rec = store.add('diary', { mood: 1 });
+
+    expect(() => store.update('moodAvg', 'moodAvg-0', { mean: 1 })).toThrow(/computed/);
+    expect(() => store.remove('moodAvg', 'moodAvg-0')).toThrow(/computed/);
+    store.update('diary', rec.id, { mood: 4 });
+    expect(store.list('diary').at(-1)?.values).toEqual({ mood: 4 });
+  });
+
   it.each([
     ['not a list', 'function main() { return 5; }'],
     ['a record without createdAt', 'function main() { return [{ values: { mean: 1 } }]; }'],

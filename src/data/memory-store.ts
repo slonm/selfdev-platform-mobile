@@ -7,6 +7,10 @@ export type MemoryStoreOptions = {
   initial?: Iterable<{ collection: string; record: DataRecord }>;
   /** Called after each add; persistent stores write through from here. */
   onAdd?: (collection: string, record: DataRecord) => void;
+  /** Called after a record's values were replaced. */
+  onUpdate?: (collection: string, record: DataRecord) => void;
+  /** Called after a record was deleted. */
+  onRemove?: (collection: string, id: string) => void;
 };
 
 /** In-memory `DataStore`; used in tests, and as the cache behind persistent stores. */
@@ -36,6 +40,23 @@ export function createMemoryStore(now: () => number = Date.now, options: MemoryS
       options.onAdd?.(collection, record);
       listeners.forEach((l) => l());
       return record;
+    },
+    update(collection, id, values) {
+      const list = collections.get(collection) ?? EMPTY;
+      const old = list.find((r) => r.id === id);
+      if (!old) throw new Error(`no record ${id} in "${collection}"`);
+      const record: DataRecord = { ...old, values: { ...values } };
+      collections.set(collection, list.map((r) => (r.id === id ? record : r)));
+      options.onUpdate?.(collection, record);
+      listeners.forEach((l) => l());
+      return record;
+    },
+    remove(collection, id) {
+      const list = collections.get(collection) ?? EMPTY;
+      if (!list.some((r) => r.id === id)) throw new Error(`no record ${id} in "${collection}"`);
+      collections.set(collection, list.filter((r) => r.id !== id));
+      options.onRemove?.(collection, id);
+      listeners.forEach((l) => l());
     },
     list(collection) {
       return collections.get(collection) ?? EMPTY;

@@ -114,6 +114,91 @@ describe('LayerView', () => {
     expect(screen.getByTestId('list')).toBeOnTheScreen();
   });
 
+  describe('editing a record from a list', () => {
+    async function history() {
+      const store = createMemoryStore(() => Date.UTC(2026, 9, 30, 20, 0));
+      store.add('diary', { mood: 3, note: 'calm', legacy: 'kept' });
+      const user = userEvent.setup();
+      await render(<LayerView layer={sampleLayer} store={store} />);
+      await user.press(screen.getByRole('button', { name: 'History' }));
+      await user.longPress(screen.getByTestId('list-row'));
+      return { store, user };
+    }
+
+    it('opens an editor on a long press with every field of the record', async () => {
+      await history();
+
+      expect(screen.getByLabelText('mood')).toHaveDisplayValue('3');
+      expect(screen.getByLabelText('note')).toHaveDisplayValue('calm');
+    });
+
+    it('saves the changes, keeping fields the layer no longer declares', async () => {
+      const { store, user } = await history();
+
+      await user.clear(screen.getByLabelText('note'));
+      await user.type(screen.getByLabelText('note'), 'calm, then a headache');
+      await user.press(screen.getByRole('button', { name: 'Save' }));
+
+      expect(store.list('diary').map((r) => r.values)).toEqual([{ mood: 3, note: 'calm, then a headache', legacy: 'kept' }]);
+      expect(screen.queryByLabelText('note')).toBeNull();
+    });
+
+    it('deletes the record only after a confirmation', async () => {
+      const { store, user } = await history();
+
+      await user.press(screen.getByRole('button', { name: 'Delete' }));
+      expect(store.list('diary')).toHaveLength(1);
+      await user.press(screen.getByRole('button', { name: 'Yes' }));
+
+      expect(store.list('diary')).toHaveLength(0);
+    });
+
+    it('changes nothing on cancel', async () => {
+      const { store, user } = await history();
+
+      await user.clear(screen.getByLabelText('mood'));
+      await user.press(screen.getByRole('button', { name: 'Cancel' }));
+
+      expect(store.list('diary')[0]?.values.mood).toBe(3);
+      expect(screen.queryByLabelText('mood')).toBeNull();
+    });
+
+    it('refuses a number field that is not a number', async () => {
+      const { store, user } = await history();
+
+      await user.clear(screen.getByLabelText('mood'));
+      await user.type(screen.getByLabelText('mood'), 'three');
+      await user.press(screen.getByRole('button', { name: 'Save' }));
+
+      expect(screen.getByText(/Not a number: mood/)).toBeOnTheScreen();
+      expect(store.list('diary')[0]?.values.mood).toBe(3);
+    });
+
+    it('does not offer editing records a script computes', async () => {
+      const layer: UserLayer = {
+        ...sampleLayer,
+        collections: { ...sampleLayer.collections, doubled: { fields: { x: { type: 'number' } }, compute: 'double' } },
+        scripts: {
+          double: {
+            source:
+              'function main(i) { return i.collections.diary.map(function (r) { return { createdAt: r.createdAt, values: { x: r.values.mood * 2 } }; }); }',
+            tests: [{ name: 't', input: { collections: { diary: [] } }, expect: [] }],
+          },
+        },
+        screens: { ...sampleLayer.screens, about: { title: 'About', body: [{ type: 'list', collection: 'doubled', fields: ['x'] }] } },
+      };
+      const store = createMemoryStore(() => 1);
+      store.add('diary', { mood: 2 });
+      const user = userEvent.setup();
+      await render(<LayerView layer={layer} store={store} />);
+      await user.press(screen.getByRole('tab', { name: 'About' }));
+
+      await user.longPress(screen.getByTestId('list-row'));
+
+      expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    });
+  });
+
   describe('a stopwatch', () => {
     function timed(): UserLayer {
       return {

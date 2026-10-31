@@ -250,6 +250,25 @@ describe('SelfDevApp', () => {
     expect(screen.getByTestId('keyboard-avoiding')).toContainElement(screen.getByTestId('selfdev-root'));
   });
 
+  it("edits list records in the app's words", async () => {
+    const user = userEvent.setup();
+    await render(
+      <SelfDevApp
+        defaultLayer={layer}
+        services={services(nodeSqlite()).services}
+        strings={{ editSave: 'Сохранить', editDelete: 'Удалить', editCancel: 'Отмена' }}
+      />
+    );
+    await user.press(await screen.findByRole('button', { name: 'Mood 3' }));
+    await user.press(screen.getByRole('button', { name: 'Save' }));
+    await user.press(screen.getByRole('button', { name: 'History' }));
+
+    await user.longPress(screen.getByTestId('list-row'));
+
+    expect(screen.getByRole('button', { name: 'Сохранить' })).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Удалить' })).toBeOnTheScreen();
+  });
+
   it('boots into the default layer', async () => {
     await render(<SelfDevApp defaultLayer={layer} services={services(nodeSqlite()).services} />);
 

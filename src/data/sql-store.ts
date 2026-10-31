@@ -61,6 +61,16 @@ export async function openSqlStore(
           .then(() => undefined, onError)
       );
     },
+    onUpdate(_collection, record) {
+      pending = pending.then(() =>
+        db
+          .runAsync('UPDATE records SET values_json = ? WHERE id = ?', [JSON.stringify(record.values), record.id])
+          .then(() => undefined, onError)
+      );
+    },
+    onRemove(_collection, id) {
+      pending = pending.then(() => db.runAsync('DELETE FROM records WHERE id = ?', [id]).then(() => undefined, onError));
+    },
   });
   return { ...store, flush: () => pending };
 }

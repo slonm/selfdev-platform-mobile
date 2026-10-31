@@ -32,6 +32,14 @@ export function withComputed(
       if (computed(collection)) throw new Error(`"${collection}" is computed and read-only`);
       return base.add(collection, values, createdAt);
     },
+    update(collection, id, values) {
+      if (computed(collection)) throw new Error(`"${collection}" is computed and read-only`);
+      return base.update(collection, id, values);
+    },
+    remove(collection, id) {
+      if (computed(collection)) throw new Error(`"${collection}" is computed and read-only`);
+      base.remove(collection, id);
+    },
     list(collection) {
       const c = computed(collection);
       if (!c) return base.list(collection);

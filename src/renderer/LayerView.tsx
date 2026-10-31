@@ -20,6 +20,7 @@ export function LayerView({
   actions = {},
   runningLabel = 'Working…',
   context = {},
+  editLabels = defaultEditLabels,
 }: {
   layer: UserLayer;
   store: DataStore;
@@ -29,6 +30,8 @@ export function LayerView({
   runningLabel?: string;
   /** What the shell adds to every action's context; the store and the layer come from here. */
   context?: Omit<ActionContext, 'store' | 'layer'>;
+  /** Words of the record editor opened by a long press on a list row. */
+  editLabels?: EditLabels;
 }) {
   const store = useMemo(
     () => withComputed(baseStore, layer, { onError: (c, m) => console.warn(`computed collection "${c}": ${m}`) }),
@@ -84,6 +87,7 @@ export function LayerView({
               navigate={navigate}
               run={{ state: runs[key], start: (name) => void runAction(key, name), label: runningLabel }}
               collections={layer.collections}
+              editLabels={editLabels}
             />
           );
           return node.showIf ? (
@@ -120,12 +124,14 @@ function NodeView({
   navigate,
   run,
   collections,
+  editLabels,
 }: {
   node: Node;
   store: DataStore;
   navigate: (id: string) => void;
   run: Run;
   collections: UserLayer['collections'];
+  editLabels: EditLabels;
 }) {
   const fields = 'collection' in node ? (collections[node.collection]?.fields ?? {}) : {};
   switch (node.type) {
@@ -134,7 +140,15 @@ function NodeView({
     case 'form':
       return <FormView node={node} store={store} fields={fields} run={run} />;
     case 'list':
-      return <ListView node={node} store={store} fields={fields} />;
+      return (
+        <ListView
+          node={node}
+          store={store}
+          fields={fields}
+          editable={collections[node.collection]?.compute === undefined}
+          labels={editLabels}
+        />
+      );
     case 'chart':
       return <ChartView node={node} store={store} fields={fields} />;
     case 'action':
@@ -326,29 +340,175 @@ function FormView({
   );
 }
 
-function ListView({ node, store, fields }: { node: NodeOf<'list'>; store: DataStore; fields: Fields }) {
+function ListView({
+  node,
+  store,
+  fields,
+  editable,
+  labels,
+}: {
+  node: NodeOf<'list'>;
+  store: DataStore;
+  fields: Fields;
+  editable: boolean;
+  labels: EditLabels;
+}) {
   const records = useCollection(store, node.collection);
+  const [editing, setEditing] = useState<string | null>(null);
   if (records.length === 0) return null;
   return (
     <View testID="list" style={styles.card}>
       {[...records].reverse().slice(0, node.limit).map((r) => {
+        if (r.id === editing) {
+          return (
+            <RecordEditor
+              key={r.id}
+              record={r}
+              collection={node.collection}
+              fields={fields}
+              store={store}
+              labels={labels}
+              onClose={() => setEditing(null)}
+            />
+          );
+        }
         const parts = node.fields.flatMap((f) => {
           const v = r.values[f];
           return v === undefined ? [] : [`${fields[f]?.label ?? f}: ${valueText(v, fields[f], true)}`];
         });
         return (
-          <View
+          <Pressable
             key={r.id}
             testID="list-row"
             accessible
             accessibilityLabel={`${formatTime(r.createdAt)} — ${parts.join(', ')}`}
+            onLongPress={editable ? () => setEditing(r.id) : undefined}
             style={styles.row}>
             <Text style={styles.hint}>{formatTime(r.createdAt)}</Text>
             <Text style={styles.text}>{parts.join(' · ')}</Text>
-          </View>
+          </Pressable>
         );
       })}
     </View>
+  );
+}
+
+/** Words of the record editor; the shell passes its own (translated) strings. */
+export type EditLabels = {
+  save: string;
+  delete: string;
+  cancel: string;
+  confirmDelete: string;
+  yes: string;
+  no: string;
+  notANumber: string;
+};
+
+export const defaultEditLabels: EditLabels = {
+  save: 'Save',
+  delete: 'Delete',
+  cancel: 'Cancel',
+  confirmDelete: 'Delete this record?',
+  yes: 'Yes',
+  no: 'No',
+  notANumber: 'Not a number:',
+};
+
+/**
+ * Edits one stored record in place (opened by a long press on its list row): every declared field
+ * as text, empty meaning "no value"; fields the layer no longer declares are kept as they are.
+ * Deleting asks first.
+ */
+function RecordEditor({
+  record,
+  collection,
+  fields,
+  store,
+  labels,
+  onClose,
+}: {
+  record: DataRecord;
+  collection: string;
+  fields: Fields;
+  store: DataStore;
+  labels: EditLabels;
+  onClose: () => void;
+}) {
+  const declared = Object.entries(fields);
+  const [text, setText] = useState<Record<string, string>>(() =>
+    Object.fromEntries(declared.map(([f]) => [f, record.values[f] === undefined ? '' : String(record.values[f])]))
+  );
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const save = () => {
+    const values: Record<string, FieldValue> = Object.fromEntries(
+      Object.entries(record.values).filter(([f]) => !Object.hasOwn(fields, f))
+    );
+    for (const [f, def] of declared) {
+      const raw = text[f] ?? '';
+      if (raw.trim() === '') continue;
+      if (def.type === 'number') {
+        const n = Number(raw.trim().replace(',', '.'));
+        if (!Number.isFinite(n)) return setError(`${labels.notANumber} ${def.label ?? f}`);
+        values[f] = n;
+      } else {
+        values[f] = raw;
+      }
+    }
+    store.update(collection, record.id, values);
+    onClose();
+  };
+
+  return (
+    <View style={styles.editor}>
+      <Text style={styles.hint}>{formatTime(record.createdAt)}</Text>
+      {declared.map(([f, def]) => {
+        const name = def.label ?? f;
+        const choices =
+          'valueLabels' in def && def.valueLabels
+            ? Object.entries(def.valueLabels)
+                .map(([v, l]) => `${v} = ${l}`)
+                .join(', ')
+            : undefined;
+        return (
+          <View key={f} style={styles.field}>
+            <Text style={styles.label}>{def.unit ? `${name}, ${def.unit}` : name}</Text>
+            <TextInput
+              accessibilityLabel={name}
+              value={text[f] ?? ''}
+              onChangeText={(t) => setText((old) => ({ ...old, [f]: t }))}
+              keyboardType={def.type === 'number' ? 'numeric' : 'default'}
+              multiline={def.type === 'text'}
+              style={[styles.input, def.type === 'text' && styles.inputMultiline]}
+            />
+            {choices && <Text style={styles.hint}>{choices}</Text>}
+          </View>
+        );
+      })}
+      {error && <Text style={styles.error}>{error}</Text>}
+      {confirming ? (
+        <View style={styles.editorButtons}>
+          <Text style={styles.text}>{labels.confirmDelete}</Text>
+          <EditorButton label={labels.yes} danger onPress={() => store.remove(collection, record.id)} />
+          <EditorButton label={labels.no} onPress={() => setConfirming(false)} />
+        </View>
+      ) : (
+        <View style={styles.editorButtons}>
+          <EditorButton label={labels.save} onPress={save} />
+          <EditorButton label={labels.delete} danger onPress={() => setConfirming(true)} />
+          <EditorButton label={labels.cancel} onPress={onClose} />
+        </View>
+      )}
+    </View>
+  );
+}
+
+function EditorButton({ label, onPress, danger }: { label: string; onPress: () => void; danger?: boolean }) {
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={[styles.editorButton, danger && styles.buttonRunning]}>
+      <Text style={styles.buttonText}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -441,6 +601,9 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.4 },
   buttonText: { fontSize: 16, color: '#fff', fontWeight: '600' },
   row: { gap: 2, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#ddd' },
+  editor: { gap: 10, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#ddd' },
+  editorButtons: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  editorButton: { minHeight: 40, paddingHorizontal: 14, borderRadius: 8, backgroundColor: ACCENT, alignItems: 'center', justifyContent: 'center' },
   bars: { flexDirection: 'row', alignItems: 'flex-end', gap: 3 },
   bar: { flex: 1, maxWidth: 16, backgroundColor: ACCENT, borderRadius: 2 },
   tabs: { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#ccc', backgroundColor: '#fff' },

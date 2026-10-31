@@ -35,6 +35,20 @@ describe('SQLite data store', () => {
     ]);
   });
 
+  it('keeps edits and removals across reopening', async () => {
+    const db = nodeSqlite();
+    const first = await openSqlStore(db, { now: () => 1000 });
+    const edited = first.add('diary', { mood: 1 });
+    const gone = first.add('diary', { mood: 2 });
+    first.update('diary', edited.id, { mood: 4, note: 'later' });
+    first.remove('diary', gone.id);
+    await first.flush();
+
+    const reopened = await openSqlStore(db);
+
+    expect(reopened.list('diary')).toEqual([{ id: edited.id, createdAt: 1000, values: { mood: 4, note: 'later' } }]);
+  });
+
   it('keeps record ids stable across reopening', async () => {
     const db = nodeSqlite();
     const first = await openSqlStore(db);

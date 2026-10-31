@@ -83,6 +83,13 @@ export const defaultStrings = {
   version: 'Version:',
   nativeUpdate: 'A new version of the app is available',
   downloadApp: 'Download app',
+  editSave: 'Save',
+  editDelete: 'Delete',
+  editCancel: 'Cancel',
+  editConfirmDelete: 'Delete this record?',
+  editYes: 'Yes',
+  editNo: 'No',
+  editNotANumber: 'Not a number:',
 };
 export type ShellStrings = typeof defaultStrings;
 
@@ -316,6 +323,15 @@ export function SelfDevApp({
             actions={actions}
             runningLabel={strings.running}
             context={actionContext(booted)}
+            editLabels={{
+              save: strings.editSave,
+              delete: strings.editDelete,
+              cancel: strings.editCancel,
+              confirmDelete: strings.editConfirmDelete,
+              yes: strings.editYes,
+              no: strings.editNo,
+              notANumber: strings.editNotANumber,
+            }}
           />
         </>
       )}

@@ -21,6 +21,10 @@ export interface DataStore {
   add(collection: string, values: Record<string, FieldValue>, createdAt?: number): DataRecord;
   /** Records of one collection in time order (`createdAt`; equal times in the order added). */
   list(collection: string): readonly DataRecord[];
+  /** Replaces the values of record `id` (its id and time stay); throws when there is no such record. */
+  update(collection: string, id: string, values: Record<string, FieldValue>): DataRecord;
+  /** Deletes record `id`; throws when there is no such record. */
+  remove(collection: string, id: string): void;
   /** Calls `listener` after any change; returns the unsubscribe function. */
   subscribe(listener: () => void): () => void;
 }

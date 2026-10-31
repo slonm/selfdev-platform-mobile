@@ -77,7 +77,7 @@ tests run before a proposal may preview; a broken result at runtime empties only
 |---|---|
 | `text` | static text |
 | `form` | adds a record to `collection`; optional `action` runs an app action right after saving (one button answers and acts), `requireAll` keeps the button unavailable until every scale is answered; inputs: `scale` (number field, integer `min` < `max`, optional end labels), `textInput` (text field, optional `multiline`) |
-| `list` | records of `collection`, newest first, showing `fields`; optional `limit` keeps only that many newest (1 makes a status line); an empty list draws nothing |
+| `list` | records of `collection`, newest first, showing `fields`; a long press on a row opens an editor for the record (every declared field; Save, Delete with confirmation, Cancel), except for computed collections; optional `limit` keeps only that many newest (1 makes a status line); an empty list draws nothing |
 | `chart` | number `series` of `collection` against record time |
 | `button` | `navigate` to a screen |
 | `stopwatch` | start/stop timer showing m:ss; each stop adds a record to `collection` with the elapsed whole seconds in number `field` (e.g. breath holds per round) |

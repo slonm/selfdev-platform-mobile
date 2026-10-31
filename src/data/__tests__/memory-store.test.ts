@@ -35,6 +35,35 @@ describe('memory data store', () => {
     expect(store.list('diary').map((r) => r.values.mood)).toEqual([2, 1, 3]);
   });
 
+  it('replaces the values of a record, keeping its id and time, and tells subscribers', () => {
+    const store = createMemoryStore(() => 1000);
+    const rec = store.add('diary', { mood: 1, note: 'old' });
+    const seen: number[] = [];
+    store.subscribe(() => seen.push(1));
+
+    store.update('diary', rec.id, { mood: 3 });
+
+    expect(store.list('diary')).toEqual([{ id: rec.id, createdAt: 1000, values: { mood: 3 } }]);
+    expect(seen).toHaveLength(1);
+  });
+
+  it('removes a record', () => {
+    const store = createMemoryStore(() => 1000);
+    const a = store.add('holds', { seconds: 5 });
+    store.add('holds', { seconds: 90 });
+
+    store.remove('holds', a.id);
+
+    expect(store.list('holds').map((r) => r.values.seconds)).toEqual([90]);
+  });
+
+  it('refuses to change a record it does not have', () => {
+    const store = createMemoryStore();
+
+    expect(() => store.update('diary', 'nope', {})).toThrow(/nope/);
+    expect(() => store.remove('diary', 'nope')).toThrow(/nope/);
+  });
+
   it('gives each record a distinct id', () => {
     const store = createMemoryStore(() => 0);
 
